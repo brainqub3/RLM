@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python .claude/skills/rlm/scripts/rlm_repl.py exec:*)"
+    ]
+  }
+}
