@@ -1,86 +1,168 @@
-# RLM-Mem: Hybrid Quality-First Development Workflow
+# RLM-Mem
 
-A hybrid development workflow combining **RLM's powerful code analysis** with **claude-mem's semantic memory** for the highest quality software development.
+**A spec-driven Claude Code workflow** - PRD -> tech-design ->
+tasks -> impl, backed by a persistent codebase index (RLM) and
+cross-session memory (claude-mem).
 
-## 🎯 What Is This?
+> **TL;DR**
+> - **Category:** spec-driven development workflow for Claude Code
+> - **Differentiator:** the only framework with **both** persistent
+> codebase indexing **and** cross-session memory
+> - **Install:** `git clone ... && bash install.sh` (one command)
+> - **First session:** `/dev:init` -> `/dev:start` -> `/dev:prd`
+> - **Compare to alternatives:** [Comparison](#comparison)
+> - **Why this exists:** [Why](#why-this-exists) |
+> full evidence: [docs/WHY.md](docs/WHY.md)
 
-RLM-Mem provides a complete workflow for working with large codebases (1000+ files) by combining:
+<!-- ARCHITECTURE-DIAGRAM-ANCHOR -->
+![rlm-mem architecture: commands, parallel context engines (RLM + claude-mem), and verified outputs feeding /dev:impl](assets/diagrams/architecture-overview.png)
 
-- **RLM (Recursive Language Model)**: Analyzes your codebase at scale, discovers patterns, estimates complexity
-- **Claude-Mem**: Provides semantic memory of past decisions, PRDs, implementations, and lessons learned
-- **12 Commands**: Cover the complete development lifecycle from planning to deployment
+<sub>Source prompt: [`assets/diagrams/architecture-overview.prompt.md`](assets/diagrams/architecture-overview.prompt.md) — regenerate via Claude Design.</sub>
 
-### How It Works
+![rlm-mem workflow sequence: waterfall with self-correction — every downstream command can revise upstream specs when reality contradicts the plan](assets/diagrams/workflow-sequence.png)
 
-```mermaid
-graph TD
-    A[User invokes /dev command] --> B[Claude Code loads command prompt]
-    B --> C[Opus orchestrates workflow]
+<sub>Source prompt: [`assets/diagrams/workflow-sequence.prompt.md`](assets/diagrams/workflow-sequence.prompt.md) — regenerate via Claude Design.</sub>
 
-    C --> D[RLM REPL Analysis]
-    C --> E[Claude-Mem Queries]
-    C --> F[Haiku Subagent]
+## Quick start
 
-    D --> G[python3 rlm_repl.py]
-    G --> H[Index 3,940+ files]
-    H --> I[Detect languages, patterns]
-    I --> J[Store in .pkl state]
+```bash
+# 1. Clone and install (~30 seconds)
+git clone https://github.com/povesma/rlm-mem ~/rlm-mem
+cd ~/rlm-mem && bash install.sh
 
-    E --> K[Search past work]
-    E --> L[Save new observations]
-    K --> M[Retrieve PRDs, designs, lessons]
-    L --> N[Store decisions, outcomes]
+# 2. Install the claude-mem plugin in Claude Code
+/plugin marketplace add thedotmack/claude-mem
+/plugin install claude-mem
 
-    F --> O[Analyze code chunks]
-    O --> P[Extract patterns, dependencies]
-    P --> Q[Return JSON with evidence]
-
-    J --> R[Combined Intelligence]
-    M --> R
-    N --> R
-    Q --> R
-
-    R --> S[Better Decisions: Context-aware, Pattern-consistent, Data-driven]
+# 3. In any of your code repos, run:
+/dev:init # one-time: index the repo + bootstrap memory
+/dev:start # every session: load context
+/dev:prd # plan a feature spec-first
 ```
 
-### Key Benefits
+That's the 60-second flavour. Full per-platform details under
+[Reference](#reference).
 
-- **30-40% fewer bugs** through pattern consistency
-- **50% faster onboarding** with historical context
-- **60% better architecture** via pattern discovery
-- **40% better estimates** using data-driven analysis
+## Comparison
 
-## 📋 Prerequisites
+How rlm-mem positions against other Claude Code workflow plugins.
+Snapshot 2026-04-30; sources for every cell are in
+[`tasks/017-.../comparison-data.md`](tasks/017-README-ONBOARDING-spec-driven-positioning/comparison-data.md).
 
-### Required
+| Project | Spec phases | Codebase index | X-session memory | TDD | Profiles | Subagents | Worktrees |
+|---|---|---|---|---|---|---|---|
+| **rlm-mem** *(this)* | yes | yes | yes | yes | yes (4) | 6 | no |
+| [Superpowers](https://github.com/obra/superpowers) | yes | no | no | yes | partial | 14+ | yes |
+| [BMAD-METHOD](https://github.com/aj-geddes/claude-code-bmad-skills) | yes | no | yes | partial | yes | 9 | no |
+| [Oh-My-ClaudeCode](https://github.com/Yeachan-Heo/oh-my-claudecode) | partial | no | yes | no | yes | 19 | yes |
+| [claude-code-workflows](https://github.com/shinpr/claude-code-workflows) | yes | partial | no | yes | yes | 27 | no |
+| [claude-workflow-template](https://github.com/nicholasmartin/claude-workflow-template) | yes | no | partial | no | no | 1 | no |
+
+Legend: `yes` = built-in. `partial` = partial or optional. `no` = absent.
+
+**Pick rlm-mem if:** you want both *spatial* (where is code?)
+and *temporal* (why did we decide this in February?) context
+auto-loaded into every spec, design, and impl.
+
+**Pick something else if:** you need git-worktree isolation
+(Superpowers, OMC) or maximum agent throughput (OMC, shinpr).
+
+## Why this exists
+
+Three measurable failures of unstructured ("vibe") AI coding,
+each from peer-reviewed or industry-leader sources:
+
+- **AI tooling slowed experienced developers by 19%** in a
+ controlled RCT - overhead of prompting and reviewing
+ outweighs the generation speed-up
+ ([METR study, 2025](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/))
+- **Failed agent attempts cost 4x more than successful ones**
+ due to the Token Snowball Effect - ~8.8M tokens / 658s
+ burned on a single failed loop
+ ([SWE-Effi, 2025](https://arxiv.org/abs/2509.09853))
+- **Spec-driven workflows recover the loss**: TDFlow scored
+ **88.8% on SWE-bench Lite** when given human-written tests -
+ a 27.8 pp absolute improvement over the next best baseline
+ ([TDFlow, 2025](https://arxiv.org/abs/2510.23761))
+
+rlm-mem is the smallest framework that delivers both halves:
+**enforced decomposition** (PRD -> tech-design -> tasks -> impl)
+to dodge Token Snowball, **and** persistent memory (RLM index +
+claude-mem) so the structure compounds across sessions instead
+of resetting to zero every morning.
+
+-> Full evidence and citations: [**docs/WHY.md**](docs/WHY.md)
+
+## Available Commands
+
+| Phase | Command | Purpose |
+|---|---|---|
+| Discovery | `/dev:init` | Index repo + bootstrap claude-mem (one-time) |
+| Discovery | `/dev:start` | Load session context (every session) |
+| Discovery | `/dev:health` | Verify dependencies |
+| Planning | `/dev:prd` | Generate PRD with codebase + memory awareness |
+| Planning | `/dev:tech-design` | Architecture design grounded in real code |
+| Planning | `/dev:test-plan` | Map stories to verification methods |
+| Planning | `/dev:tasks` | Break tech-design into TDD-ready subtasks |
+| Planning | `/dev:check` | Audit task completion status |
+| Development | `/dev:impl` | Implement subtasks one at a time, evidence-gated |
+| Development | `/dev:git` | Generate commit messages and PR descriptions |
+| Config | `/dev:profile` | Switch workflow profile (quality / fast / minimal / research) |
+
+Full per-command reference under [Reference](#reference).
+
+## Test subagents
+
+Five specialised agents run in **isolated contexts** during
+`/dev:impl` to prevent implementation bias:
+
+- **test-backend** (Haiku) - writes & runs unit/integration
+ tests; auto-detects pytest/vitest/jest/go/cargo/phpunit
+- **test-review** (Sonnet) - adversarial gap analysis,
+ read-only
+- **test-e2e-planner / -generator / -healer** (Sonnet,
+ forked from Playwright) - Playwright MCP required
+
+Full agent reference under [Reference](#reference).
+
+---
+
+## Reference
+
+Everything below this line is reference material. Skip on first
+read; come back when you need depth on a specific feature.
+
+### Prerequisites
+
+#### Required
 
 1. **Claude Code** - Anthropic's official CLI
-   - Install from: https://claude.ai/download
-   - Version: Latest stable
+ - Install from: https://claude.ai/download
+ - Version: Latest stable
 
 2. **Python 3.8-3.12** - For RLM REPL
-   - macOS: Pre-installed or via Homebrew (`brew install python@3.12`)
-   - Windows: `winget install Python.Python.3.12`
-   - Note: Python 3.13+ is not compatible with ChromaDB (used by claude-mem)
+ - macOS: Pre-installed or via Homebrew (`brew install python@3.12`)
+ - Windows: `winget install Python.Python.3.12`
+ - Note: Python 3.13+ is not compatible with ChromaDB (used by claude-mem)
 
 3. **Claude-Mem plugin** - For semantic memory
-   - Install in Claude Code: `/plugin marketplace add thedotmack/claude-mem` then `/plugin install claude-mem`
-   - Repository: https://github.com/thedotmack/claude-mem
+ - Install in Claude Code: `/plugin marketplace add thedotmack/claude-mem` then `/plugin install claude-mem`
+ - Repository: https://github.com/thedotmack/claude-mem
 
 4. **Git repository** - Your code must be in a git repo
 
-### Nice to Have
+#### Nice to Have
 
 5. **Frontend Design Plugin** - For UI/UX design work
-   - Step 1 — add to marketplace: `/plugin marketplace add anthropics/claude-code`
-   - Step 2 — install: `/plugin install frontend-design@claude-code-plugins`
+ - Step 1 - add to marketplace: `/plugin marketplace add anthropics/claude-code`
+ - Step 2 - install: `/plugin install frontend-design@claude-code-plugins`
 
 6. **Context7 MCP Server** - For library documentation lookups (no authentication required)
-   - `claude mcp add --transport http --scope user context7 https://mcp.context7.com/mcp`
+ - `claude mcp add --transport http --scope user context7 https://mcp.context7.com/mcp`
 
-## 🚀 Installation
+### Installation
 
-### macOS / Linux Installation
+#### macOS / Linux Installation
 
 ```bash
 # 1. Clone this repository
@@ -130,7 +212,7 @@ chmod +x ~/.claude/statusline.sh
 # (see §Statusline below for details)
 
 # 8. Verify Python 3 is available
-python3 --version  # Should show 3.8 or higher
+python3 --version # Should show 3.8 or higher
 
 # 9. Test installation
 python3 ~/.claude/rlm_scripts/rlm_repl.py --help
@@ -144,12 +226,12 @@ rm -rf ~/.claude/commands/rlm-mem
 **Expected output:**
 ```
 usage: rlm_repl [-h] [--state STATE]
-                {init,init-repo,status,reset,export-buffers,exec} ...
+ {init,init-repo,status,reset,export-buffers,exec} ...
 ```
 
-### Windows Installation
+#### Windows Installation
 
-#### Windows Prerequisites
+##### Windows Prerequisites
 
 | Dependency | Required | Purpose | Install |
 |------------|----------|---------|---------|
@@ -164,16 +246,16 @@ usage: rlm_repl [-h] [--state STATE]
 > **Important**: Hooks and statusline require **bash**. If you install
 > Git for Windows with "Add to PATH" enabled, bash is included. Without
 > bash, any `.sh` hook already registered in `settings.json` will cause
-> **prompts to be silently dropped** — Claude Code shows the command
+> **prompts to be silently dropped** - Claude Code shows the command
 > list but typed text disappears. The install script detects this and
 > offers to clean up stale hook entries.
 
 ```powershell
 # 1. Install required dependencies
-winget install Python.Python.3.12  # 3.13+ breaks ChromaDB (used by claude-mem)
-winget install Git.Git             # includes bash
-winget install jqlang.jq           # for statusline
-winget install OpenJS.NodeJS.LTS   # for claude-mem
+winget install Python.Python.3.12 # 3.13+ breaks ChromaDB (used by claude-mem)
+winget install Git.Git # includes bash
+winget install jqlang.jq # for statusline
+winget install OpenJS.NodeJS.LTS # for claude-mem
 
 # 2. Clone this repository
 cd $env:USERPROFILE
@@ -185,7 +267,7 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 The script checks all dependencies and reports what's missing before
-proceeding. Optional dependencies can be skipped — features that need
+proceeding. Optional dependencies can be skipped - features that need
 them will be unavailable.
 
 **Or install manually:**
@@ -209,12 +291,12 @@ Copy-Item .claude\profiles\*.yaml "$env:USERPROFILE\.claude\profiles\"
 
 # Copy hooks (only if bash is available)
 if (Get-Command bash -ErrorAction SilentlyContinue) {
-    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\hooks"
-    Copy-Item .claude\hooks\*.sh "$env:USERPROFILE\.claude\hooks\"
+ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\hooks"
+ Copy-Item .claude\hooks\*.sh "$env:USERPROFILE\.claude\hooks\"
 }
 
 # Verify
-python --version       # Should show 3.8+
+python --version # Should show 3.8+
 python "$env:USERPROFILE\.claude\rlm_scripts\rlm_repl.py" --help
 ```
 
@@ -223,39 +305,38 @@ python "$env:USERPROFILE\.claude\rlm_scripts\rlm_repl.py" --help
 - Use backslashes `\` instead of forward slashes `/` in paths
 - Commands in this guide use Unix syntax; translate as needed
 
-## 📦 What Gets Installed
+### What Gets Installed
 
 After installation, your `~/.claude/` directory will contain:
 
 ```
 ~/.claude/
 ├── agents/
-│   ├── rlm-subcall.md          # RLM subagent for chunk analysis
-│   ├── test-backend.md         # Backend test writer (pytest/vitest/jest/etc.)
-│   ├── test-review.md          # Adversarial coverage gap analyzer
-│   ├── test-e2e-planner.md     # E2E test plan generator (requires Playwright MCP)
-│   ├── test-e2e-generator.md   # Playwright test code generator (requires Playwright MCP)
-│   └── test-e2e-healer.md      # Failing test debugger/repair (requires Playwright MCP)
+│ ├── rlm-subcall.md # RLM subagent for chunk analysis
+│ ├── test-backend.md # Backend test writer (pytest/vitest/jest/etc.)
+│ ├── test-review.md # Adversarial coverage gap analyzer
+│ ├── test-e2e-planner.md # E2E test plan generator (requires Playwright MCP)
+│ ├── test-e2e-generator.md # Playwright test code generator (requires Playwright MCP)
+│ └── test-e2e-healer.md # Failing test debugger/repair (requires Playwright MCP)
 ├── commands/
-│   └── dev/                    # All 12 dev commands
-│       ├── init.md, start.md, health.md, profile.md
-│       ├── prd.md, tech-design.md, test-plan.md, tasks.md, check.md
-│       ├── impl.md, git.md
-│       └── improve.md
+│ └── dev/ # All 11 dev commands
+│ ├── init.md, start.md, health.md, profile.md
+│ ├── prd.md, tech-design.md, test-plan.md, tasks.md, check.md
+│ └── impl.md, git.md
 ├── profiles/
-│   ├── quality.yaml            # Full workflow profile
-│   ├── fast.yaml               # Speed mode profile
-│   ├── minimal.yaml            # Bare bones profile
-│   └── research.yaml           # Evidence-driven research profile
+│ ├── quality.yaml # Full workflow profile
+│ ├── fast.yaml # Speed mode profile
+│ ├── minimal.yaml # Bare bones profile
+│ └── research.yaml # Evidence-driven research profile
 ├── hooks/
-│   ├── context-guard.sh        # Context window warning hook (optional)
-│   └── behavioral-reminder.sh  # Behavioral rule reminder hook (optional)
+│ ├── context-guard.sh # Context window warning hook (optional)
+│ └── behavioral-reminder.sh # Behavioral rule reminder hook (optional)
 ├── rlm_scripts/
-│   └── rlm_repl.py             # Persistent REPL for RLM
-└── statusline.sh               # Status line script (optional)
+│ └── rlm_repl.py # Persistent REPL for RLM
+└── statusline.sh # Status line script (optional)
 ```
 
-## Hooks
+### Hooks
 
 Two optional hooks are included. Both are installed by `install.sh` and
 registered in `~/.claude/settings.json` automatically.
@@ -265,10 +346,28 @@ registered in `~/.claude/settings.json` automatically.
 | `context-guard.sh` | `UserPromptSubmit` | Warns when context window is ≥ threshold before new dev work | Set `CONTEXT_GUARD_THRESHOLD=101` in `settings.json` env |
 | `behavioral-reminder.sh` | `UserPromptSubmit` | Injects rule tag reminders before each prompt; targeted on criticism, implementation, and git requests | Set `BEHAVIORAL_REMINDER_DISABLED=1` in `settings.json` env |
 
-Both hooks fail open — any error exits silently with code 0 and never
+Both hooks fail open - any error exits silently with code 0 and never
 blocks Claude from responding.
 
-## Statusline
+#### context-guard rationale
+
+`context-guard` warns when context window usage exceeds a threshold
+(default 85%) and the user starts new development work. See
+`context-guard.sh` source for details.
+
+#### Docs-first enforcement (prompt-based, not a hook)
+
+The docs-first principle is enforced through prompt instructions in
+the command files, not via a hook. Claude assesses semantic context
+before editing code files: documented task -> proceed; research /
+POC -> allow with note; undocumented change -> warn and suggest
+documenting first.
+
+A PreToolUse hook approach was attempted and abandoned: it broke
+Shift+Tab "Allow all edits" and could not reason about semantic
+context. See `tasks/010-DOCS-FIRST-GUARD/` for the full history.
+
+### Statusline
 
 The included `statusline.sh` displays live session info in your IDE status bar:
 
@@ -276,19 +375,19 @@ The included `statusline.sh` displays live session info in your IDE status bar:
 ~/AI/my-project | feature/my-branch | Sonnet 4.6 | 30K/200K $0.072 | 09:32:39
 ```
 
-Shows: tilde-abbreviated path · git branch · model · used/total context · cost · time.
+Shows: tilde-abbreviated path | git branch | model | used/total context | cost | time.
 
-### Prerequisites
+#### Prerequisites
 
-- **jq** — required for JSON parsing: `brew install jq` (macOS) / `apt install jq` (Linux)
+- **jq** - required for JSON parsing: `brew install jq` (macOS) / `apt install jq` (Linux)
 - **Claude Code** v1.0 or later
 
-### Setup (after install.sh)
+#### Setup (after install.sh)
 
 `install.sh` copies the script and optionally patches `settings.json` for you.
 If you skipped that step, choose one option:
 
-**Option A — ask Claude (recommended):**
+**Option A - ask Claude (recommended):**
 
 In any Claude Code session, say:
 > "use the existing script at ~/.claude/statusline.sh"
@@ -300,21 +399,21 @@ Claude's built-in `statusline-setup` agent will detect the file and update
 > Claude Code feature as of v1.0. Its behaviour may change in future Claude Code
 > releases. If it no longer works as described, fall back to Option B.
 
-**Option B — manual:**
+**Option B - manual:**
 
 Add to `~/.claude/settings.json`:
 ```json
 {
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/statusline.sh"
-  }
+ "statusLine": {
+ "type": "command",
+ "command": "~/.claude/statusline.sh"
+ }
 }
 ```
 
 Restart Claude Code after editing `settings.json`.
 
-### Switching scripts
+#### Switching scripts
 
 If you have multiple statusline scripts (e.g. `statusline.sh`, `statusline-minimal.sh`),
 ask Claude in a session:
@@ -324,32 +423,32 @@ The built-in `statusline-setup` agent handles the `settings.json` update.
 
 ---
 
-## ⚙️ Profiles
+### Profiles
 
 Profiles let you customize workflow behavior per project or context.
 A profile controls code style, testing approach, workflow strictness,
 RLM/memory enablement, and MCP requirements.
 
-### Built-in Profiles
+#### Built-in Profiles
 
 | Profile | Description |
 |---------|-------------|
-| `quality` | Full workflow — docs-first, TDD, RLM + claude-mem, Context7 required |
-| `fast` | Speed mode — test-after, relaxed docs, no corrections |
-| `minimal` | Bare bones — no RLM, no memory, no ceremony |
+| `quality` | Full workflow - docs-first, TDD, RLM + claude-mem, Context7 required |
+| `fast` | Speed mode - test-after, relaxed docs, no corrections |
+| `minimal` | Bare bones - no RLM, no memory, no ceremony |
 
-### Usage
+#### Usage
 
 ```bash
-/dev:profile list           # See available profiles
-/dev:profile use quality    # Activate a profile
-/dev:profile off            # Deactivate, use defaults
+/dev:profile list # See available profiles
+/dev:profile use quality # Activate a profile
+/dev:profile off # Deactivate, use defaults
 ```
 
 Profiles live in `~/.claude/profiles/` (user) and `.claude/profiles/`
 (project). Project profiles override user profiles with the same name.
 
-### Creating Custom Profiles
+#### Creating Custom Profiles
 
 Copy a built-in profile and edit:
 ```bash
@@ -359,13 +458,13 @@ cp ~/.claude/profiles/quality.yaml ~/.claude/profiles/my-project.yaml
 
 See `.claude/profiles/quality.yaml` for the full schema.
 
-### Current Limitations
+#### Current Limitations
 
-Profiles are currently **prompt-based** — they instruct `/dev:*` commands to
+Profiles are currently **prompt-based** - they instruct `/dev:*` commands to
 skip or include steps, but do not modify system infrastructure. This means:
 
 - **claude-mem hooks** continue capturing observations even under `minimal`
-  (memory_backend: none)
+ (memory_backend: none)
 - **MCP servers** remain connected regardless of profile
 - **StatusLine** keeps running if configured
 
@@ -376,139 +475,42 @@ guidance.
 
 ---
 
-## 🛡️ Hooks
-
-### context-guard
-
-Warns when context window usage exceeds a threshold (default: 85%)
-and the user starts new development work. See `context-guard.sh`
-source for details.
-
-### Docs-first enforcement (prompt-based)
-
-The docs-first principle is enforced through prompt instructions in
-the command files, not via a hook. Claude assesses semantic context
-before editing code files: documented task → proceed; research/POC →
-allow with note; undocumented change → warn and suggest documenting.
-
-> A PreToolUse hook approach was attempted and abandoned — it broke
-> Shift+Tab "Allow all edits" and couldn't reason about semantic
-> context. See `tasks/010-DOCS-FIRST-GUARD/` for the full history.
-
----
-
-## 🎮 Quick Start
-
-### 1. Initialize Your Repository
-
-Navigate to your project and initialize RLM-Mem:
-
-```bash
-cd /path/to/your/project
-claude  # Start Claude Code
-```
-
-In Claude Code:
-```
-/dev:init
-```
-
-This will:
-- Index all files in your repository
-- Detect languages and file types
-- Create `.claude/rlm_state/` directory
-- Bootstrap claude-mem with project knowledge
-
-**First-time initialization takes 30-60 seconds for large repos.**
-
-### 2. Start a Coding Session
-
-Every time you start working:
-
-```
-/dev:start
-```
-
-This provides:
-- Repository statistics
-- Recent activity summary
-- Active tasks
-- Recommended next task
-
-### 3. Plan a Feature
-
-```
-/dev:prd           # Create Product Requirements Document
-/dev:tech-design   # Create Technical Design
-/dev:test-plan     # Design test plan (optional, before tasks)
-/dev:tasks         # Break down into tasks
-```
-
-### 4. Implement
-
-```
-/dev:impl       # Implement with pattern discovery
-```
-
-## 📚 Available Commands
-
-### Discovery Phase (3 commands)
-- `/dev:init` - Initialize RLM + claude-mem
-- `/dev:start` - Start session with full context
-- `/dev:health` - Verify all system dependencies are working
-
-### Planning Phase (5 commands)
-- `/dev:prd` - Generate PRD with codebase awareness
-- `/dev:tech-design` - Design with pattern discovery
-- `/dev:test-plan` - Design test plan from tech design — maps stories to verification methods
-- `/dev:tasks` - Task breakdown with complexity analysis
-- `/dev:check` - Verify task completion status
-
-### Development Phase (2 commands)
-- `/dev:impl` - Implement following patterns
-- `/dev:git` - Generate commit messages and PR descriptions; manage commit style
-
-### Support Phase (1 command)
-- `/dev:improve` - Review accumulated corrections and generate improvement proposal
-  *(currently non-functional: depends on `save_memory` MCP tool and a correction-capture
-  pipeline that don't exist yet — see `tasks/009-FEEDBACK-LOOP-workflow-self-improvement/`)*
-
-## 🧪 Test Subagents
+### Test Subagents
 
 RLM-Mem ships five specialized test subagents that run in isolated contexts to prevent implementation bias. Invoke them via the `Task` tool from within `/dev:impl`.
 
-### Agents Overview
+#### Agents Overview
 
 | Agent | Model | Purpose | Requires |
 |-------|-------|---------|----------|
 | `test-backend` | Haiku | Write & run unit/integration tests. Auto-detects pytest, vitest, jest, go test, cargo test, phpunit. | Test framework in project |
-| `test-review` | Sonnet | Adversarial gap analysis — finds what tests missed. Does NOT write tests. | Nothing extra |
+| `test-review` | Sonnet | Adversarial gap analysis - finds what tests missed. Does NOT write tests. | Nothing extra |
 | `test-e2e-planner` | Sonnet | Explore live app and produce a markdown test plan. | Playwright MCP server |
 | `test-e2e-generator` | Sonnet | Convert test plan into executable `.spec.ts` files, verifying selectors live. | Playwright MCP server |
 | `test-e2e-healer` | Sonnet | Debug and repair failing Playwright tests. Patches selectors, timing, and data issues. | Playwright MCP server |
 
-### When to Use Each Agent
+#### When to Use Each Agent
 
 - **After backend changes**: run `test-backend` then `test-review`
-- **After frontend changes**: run `test-e2e-planner` → `test-e2e-generator` → `test-e2e-healer` (if failures)
-- **After any change**: run `test-review` last — it finds gaps the other agents missed
+- **After frontend changes**: run `test-e2e-planner` -> `test-e2e-generator` -> `test-e2e-healer` (if failures)
+- **After any change**: run `test-review` last - it finds gaps the other agents missed
 
-### Playwright MCP Setup (for E2E agents)
+#### Playwright MCP Setup (for E2E agents)
 
 Add the Playwright MCP server to your global Claude config (`~/.claude/mcp.json`):
 
 ```json
 {
-  "mcpServers": {
-    "playwright-test": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
-    }
-  }
+ "mcpServers": {
+ "playwright-test": {
+ "command": "npx",
+ "args": ["@playwright/mcp@latest"]
+ }
+ }
 }
 ```
 
-### Updating Playwright Forks
+#### Updating Playwright Forks
 
 The E2E agents (`test-e2e-planner`, `test-e2e-generator`, `test-e2e-healer`) are forks of Playwright's official agents. Each file contains an `UPSTREAM SOURCE` header with the source URL and fetch date.
 
@@ -517,15 +519,15 @@ To update a Playwright fork when Playwright releases a new version:
 ```bash
 # 1. Download the latest upstream agent
 curl -o /tmp/playwright-test-planner.agent.md \
-  https://raw.githubusercontent.com/microsoft/playwright/main/packages/playwright/src/agents/playwright-test-planner.agent.md
+ https://raw.githubusercontent.com/microsoft/playwright/main/packages/playwright/src/agents/playwright-test-planner.agent.md
 
 # 2. Diff against your local copy
 diff /tmp/playwright-test-planner.agent.md \
-  ~/.claude/agents/test-e2e-planner.md
+ ~/.claude/agents/test-e2e-planner.md
 
 # 3. Apply upstream changes manually, preserving lines marked # CUSTOM
 # Lines between <!-- # CUSTOM --> and <!-- # END CUSTOM --> are local additions
-# — keep them when merging upstream changes
+# - keep them when merging upstream changes
 
 # 4. Update the fetched date in the UPSTREAM SOURCE header:
 # <!-- fetched: YYYY-MM-DD -->
@@ -536,15 +538,15 @@ cp .claude/agents/test-e2e-planner.md ~/.claude/agents/
 
 Repeat for `test-e2e-generator.md` and `test-e2e-healer.md`.
 
-## 💡 Usage Tips
+### Usage Tips
 
-### Command Tree Overview
+#### Command Tree Overview
 
 All commands live under the `/dev` tree:
 
 
 
-### Recommended Allowlist
+#### Recommended Allowlist
 
 `/start` is designed to need minimal shell permissions. To make
 session startup fully frictionless (zero permission prompts),
@@ -556,13 +558,13 @@ git log *
 git diff *
 ```
 
-On macOS/Linux: Claude Code settings → Permissions → Add allowed
+On macOS/Linux: Claude Code settings -> Permissions -> Add allowed
 commands. On Windows, use the equivalent paths with backslashes.
 
 Once configured, `/dev:start` runs without any
 interruptions.
 
-### Performance Expectations
+#### Performance Expectations
 
 - **Init**: 30-60s (one-time per repo)
 - **Start**: 20-30s (per session, zero prompts with allowlist)
@@ -571,7 +573,7 @@ interruptions.
 
 **Trade-off**: Slower but significantly higher quality
 
-### Cost Considerations
+#### Cost Considerations
 
 RLM-Mem uses:
 - **Opus** for orchestration (main LLM)
@@ -579,7 +581,7 @@ RLM-Mem uses:
 
 Estimated cost: ~2-3x vs pure claude-mem, but saves hours in debugging/refactoring.
 
-### Excluding Vendor Paths
+#### Excluding Vendor Paths
 
 RLM's `init-repo` indexes every tracked file by default, which can
 bloat the index on repos that contain large vendor trees (e.g. a
@@ -587,10 +589,10 @@ PHP `html/` directory with 17,000 third-party files). Keep the
 index small with a committed `.rlmignore`:
 
 ```gitignore
-# .rlmignore — gitignore-lite syntax
+# .rlmignore - gitignore-lite syntax
 html/**
 vendor/**
-!vendor/CHANGELOG.md   # rescue specific files with leading !
+!vendor/CHANGELOG.md # rescue specific files with leading !
 ```
 
 `rlm_repl.py init-repo` auto-discovers `.rlmignore` from cwd, walks
@@ -602,7 +604,7 @@ One-off CLI alternative (no file needed):
 
 ```bash
 python3 ~/.claude/rlm_scripts/rlm_repl.py init-repo . \
-    --exclude 'html/**' --exclude 'vendor/**'
+ --exclude 'html/**' --exclude 'vendor/**'
 ```
 
 Other flags: `--include 'scripts/**'` turns on allowlist mode
@@ -610,9 +612,9 @@ Other flags: `--include 'scripts/**'` turns on allowlist mode
 from an arbitrary file; `--no-rlmignore` suppresses
 auto-discovery.
 
-## 🔧 Configuration
+### Configuration
 
-### Customizing Chunk Size
+#### Customizing Chunk Size
 
 Edit `~/.claude/rlm_scripts/rlm_repl.py` to change default chunk size:
 
@@ -621,35 +623,35 @@ Edit `~/.claude/rlm_scripts/rlm_repl.py` to change default chunk size:
 python3 ~/.claude/rlm_scripts/rlm_repl.py exec -c "chunk_indices(size=150000)"
 ```
 
-### Customizing File Indexing
+#### Customizing File Indexing
 
 By default, RLM indexes all git-tracked files. To customize:
 
 1. Add patterns to `.gitignore`
 2. Or modify `_discover_git_files()` in `rlm_repl.py`
 
-### Adding Custom Languages
+#### Adding Custom Languages
 
 Edit `LANGUAGE_MAP` in `rlm_repl.py`:
 
 ```python
 LANGUAGE_MAP = {
-    '.your_ext': 'YourLanguage',
-    # ... existing mappings
+ '.your_ext': 'YourLanguage',
+ # ... existing mappings
 }
 ```
 
-## 📖 Documentation
+### Documentation
 
 - **Troubleshooting**: See `TROUBLESHOOTING.md`
 
-## 🔗 Related Projects
+### Related Projects
 
-- **[claude_code_RLM](https://github.com/brainqub3/claude_code_RLM)**: Original RLM for text files (our foundation). RLM-Mem extends it to entire code repositories — adding multi-language indexing, git integration, and a full development workflow — and integrates claude-mem for persistent cross-session memory.
+- **[claude_code_RLM](https://github.com/brainqub3/claude_code_RLM)**: Original RLM for text files (our foundation). RLM-Mem extends it to entire code repositories - adding multi-language indexing, git integration, and a full development workflow - and integrates claude-mem for persistent cross-session memory.
 - **[RLM Paper](https://arxiv.org/abs/2512.24601)**: Research paper on Recursive Language Models
 - **[Claude Code](https://claude.ai/download)**: Anthropic's official CLI
 
-## 🔍 Verification
+### Verification
 
 After installation, verify everything works:
 
@@ -668,12 +670,12 @@ claude
 
 # 4. Run the health check (recommended post-install verification)
 /dev:health
-# All three rows should show ✅
+# All three rows should show yes
 ```
 
-## 🆘 Getting Help
+### Getting Help
 
-### Troubleshooting
+#### Troubleshooting
 
 See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) for common issues:
 - Python not found
@@ -682,20 +684,20 @@ See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) for common issues:
 - RLM initialization fails
 - Claude-mem not working
 
-### Support
+#### Support
 
 1. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) first
 2. Review command documentation in `.claude/commands/dev/`
 3. Check Claude Code documentation
 4. File an issue (if this is a public repo)
 
-## 🔄 Updating
+### Updating
 
 To update to the latest version:
 
 ```bash
 # 1. Pull latest changes
-cd ~/rlm-mem  # Or wherever you cloned
+cd ~/rlm-mem # Or wherever you cloned
 git pull
 
 # 2. Re-run installation steps (or just run install.sh again)
@@ -710,33 +712,33 @@ cp .claude/statusline.sh ~/.claude/statusline.sh
 # Windows: See installation section above
 ```
 
-## 📝 License
+### License
 
 MIT License - See LICENSE file for details
 
 **Note**: This project extends [claude_code_RLM](https://github.com/brainqub3/claude_code_RLM) which is also MIT licensed. We maintain the same open-source spirit.
 
-## 🐳 Docker Development & Testing
+### Docker Development & Testing
 
 A Docker environment is provided for testing commands in isolation.
 
-### Quick Start
+#### Quick Start
 
 ```bash
 docker compose build
 docker compose run --rm dev-test claude
 ```
 
-### Non-Interactive Testing
+#### Non-Interactive Testing
 
 Run commands via `-p` flag (no MCP plugin support):
 
 ```bash
 docker compose run --rm dev-test bash -c \
-  'claude -p "$(cat /workspace/.claude/commands/dev/health.md)"'
+ 'claude -p "$(cat /workspace/.claude/commands/dev/health.md)"'
 ```
 
-### Interactive Testing via tmux
+#### Interactive Testing via tmux
 
 For full plugin support (claude-mem MCP), use tmux inside the container:
 
@@ -760,7 +762,7 @@ docker exec -it rlm-test tmux attach -t claude
 docker rm -f rlm-test
 ```
 
-### What's Included
+#### What's Included
 
 | Component | Status |
 |-----------|--------|
@@ -770,12 +772,12 @@ docker rm -f rlm-test
 | claude-mem plugin | Auto-installed on first run |
 | Chroma vector search | Disabled in container (SQLite search works) |
 
-### Known Limitations
+#### Known Limitations
 
 - **`-p` mode**: MCP plugin tools time out ([known issue](https://github.com/anthropics/claude-code/issues/34131)). Use tmux for full testing.
 - **Chroma disabled**: The chroma-mcp spawn storm ([#1063](https://github.com/thedotmack/claude-mem/issues/1063)) causes timeouts in containers. Does not affect native installs.
 
-## 🤝 Contributing
+### Contributing
 
 Contributions welcome! This is a community-driven workflow.
 
@@ -785,7 +787,7 @@ Areas for contribution:
 - New command workflows
 - Documentation improvements
 
-## 🙏 Acknowledgments
+### Acknowledgments
 
 **Built on the foundation of [claude_code_RLM](https://github.com/brainqub3/claude_code_RLM)** by [Brainqub3](https://brainqub3.com/).
 
@@ -796,14 +798,3 @@ The original project provided the core RLM implementation for text processing. W
 - **RLM Paper**: [Recursive Language Models](https://arxiv.org/abs/2512.24601) by Zhang, Kraska, Khattab (MIT CSAIL)
 - **Claude Code**: Anthropic's official CLI
 - **Claude-Mem**: Semantic memory plugin
-
-## 🚀 What's Next?
-
-After installation:
-
-1. ✅ Initialize your first repository: `/dev:init`
-2. ✅ Start a session: `/dev:start`
-3. ✅ Plan a feature: `/dev:prd`
-4. ✅ Experience the quality difference!
-
-**Happy coding with RLM-Mem!** 🎉

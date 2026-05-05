@@ -304,21 +304,6 @@ are the durable record of what was tested and how.
 - If parent task completed, save to claude-mem and update
   ai-docs/ if present
 
-### 8. Session Wrap-Up Check
-
-Before ending the session, check for captured corrections:
-
-```
-mcp__plugin_claude-mem_mcp-search__search(
-  query="[TYPE: CORRECTION] [STATUS: pending]",
-  limit=1
-)
-```
-
-- If results exist: suggest `"{N} workflow corrections captured —
-  run /dev:improve to review and package feedback"`
-- If no results: say nothing about corrections
-
 ## Context7
 
 When referencing any library, framework, or external API — use the Context7 MCP to look up current documentation rather than guessing. Call `mcp__context7__resolve-library-id` then `mcp__context7__get-library-docs`. Never invent API signatures or assume version-specific behaviour.

@@ -1,0 +1,74 @@
+# README baseline snapshot
+Captured: 2026-04-30
+
+## Line count
+     809 README.md
+
+## H2 headings
+5:## 🎯 What Is This?
+53:## 📋 Prerequisites
+81:## 🚀 Installation
+226:## 📦 What Gets Installed
+258:## Hooks
+271:## Statusline
+327:## ⚙️ Profiles
+379:## 🛡️ Hooks
+400:## 🎮 Quick Start
+453:## 📚 Available Commands
+476:## 🧪 Test Subagents
+539:## 💡 Usage Tips
+613:## 🔧 Configuration
+642:## 📖 Documentation
+646:## 🔗 Related Projects
+652:## 🔍 Verification
+674:## 🆘 Getting Help
+692:## 🔄 Updating
+713:## 📝 License
+719:## 🐳 Docker Development & Testing
+778:## 🤝 Contributing
+788:## 🙏 Acknowledgments
+800:## 🚀 What's Next?
+
+## H3 headings
+13:### How It Works
+46:### Key Benefits
+55:### Required
+72:### Nice to Have
+83:### macOS / Linux Installation
+150:### Windows Installation
+281:### Prerequisites
+286:### Setup (after install.sh)
+317:### Switching scripts
+333:### Built-in Profiles
+341:### Usage
+352:### Creating Custom Profiles
+362:### Current Limitations
+381:### context-guard
+387:### Docs-first enforcement (prompt-based)
+402:### 1. Initialize Your Repository
+424:### 2. Start a Coding Session
+438:### 3. Plan a Feature
+447:### 4. Implement
+455:### Discovery Phase (3 commands)
+460:### Planning Phase (5 commands)
+467:### Development Phase (2 commands)
+471:### Support Phase (1 command)
+480:### Agents Overview
+490:### When to Use Each Agent
+496:### Playwright MCP Setup (for E2E agents)
+511:### Updating Playwright Forks
+541:### Command Tree Overview
+547:### Recommended Allowlist
+565:### Performance Expectations
+574:### Cost Considerations
+582:### Excluding Vendor Paths
+615:### Customizing Chunk Size
+624:### Customizing File Indexing
+631:### Adding Custom Languages
+676:### Troubleshooting
+685:### Support
+723:### Quick Start
+730:### Non-Interactive Testing
+739:### Interactive Testing via tmux
+763:### What's Included
+773:### Known Limitations
