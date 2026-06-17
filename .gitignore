@@ -1,2 +1,6 @@
 # RLM state (persistent REPL)
 .claude/rlm_state/
+
+# Python caches
+__pycache__/
+*.pyc

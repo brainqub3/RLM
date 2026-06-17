@@ -1,15 +1,17 @@
-# RLM eval — OOLONG (`trec_coarse`) long-context subset
+# OOLONG (`trec_coarse`) long-context eval subset
 
-A small, self-contained evaluation set for scoring this repo's RLM implementation
-(the `/rlm` skill + its programmatic `llm_query` sub-LM) on a genuinely
-**long-context**, information-dense reasoning task.
+A small, self-contained evaluation set for scoring **any** long-context method —
+a base model call, an agent, a retrieval/compaction scaffold, the `/rlm` skill,
+etc. — on a genuinely **long-context**, information-dense reasoning task. You
+produce a predictions file with whatever system you like and score it; the eval
+has no dependency on any particular method.
 
 ## Why this benchmark
 
 The reference paper (`paper/2512.24601v3.pdf`, *Recursive Language Models*, arXiv:2512.24601)
 reports four long-context benchmarks in its Table 1 — **CodeQA**, **BrowseComp-Plus**,
 **OOLONG**, and **OOLONG-Pairs** (§3.1/Figure 1 also use **S-NIAH** as a scaling baseline).
-Of these, **OOLONG** is the cleanest fit for this repo's RLM harness, which operates over a
+Of these, **OOLONG** is the cleanest fit for a setup that operates over a
 *single large context file + a query*. The paper describes it as (§3.1, verbatim):
 
 > **OOLONG** [Bertsch et al., 2025]. A long reasoning benchmark that requires semantically
@@ -35,7 +37,7 @@ eval/
 ├── data/
 │   ├── oolong_trec_coarse.jsonl          # manifest: one JSON line per eval item
 │   ├── contexts/
-│   │   └── trec_coarse_cw<cwid>.txt      # FULL model-facing context (no labels)  ← feed this to /rlm
+│   │   └── trec_coarse_cw<cwid>.txt      # FULL model-facing context (no labels)  ← feed this to your method
 │   └── contexts_with_labels/
 │       └── trec_coarse_cw<cwid>.txt      # same context WITH gold labels (verification only)
 ├── _cache/                               # download/build/verify scripts (provenance; raw cache gitignored)
@@ -53,8 +55,8 @@ Each item is one OOLONG `trec_coarse` task at a context length of **131,072 toke
 The 10 items are drawn over the **2 distinct long contexts** available at this length
 (`context_window_id` 6 and 8, each 3,182 labelled TREC questions); contexts are stored
 once and shared by the items that use them. **Context is never trimmed** — each
-`contexts/*.txt` holds the entire context verbatim (the file you feed to `/rlm` is the
-exact, full context).
+`contexts/*.txt` holds the entire context verbatim (the file you feed to your method
+is the exact, full context).
 
 ### Manifest fields (`data/oolong_trec_coarse.jsonl`)
 
@@ -89,25 +91,36 @@ and then aggregate — defeating retrieval-style shortcuts.
 
 ## How to run the eval
 
-For each item in the manifest, run the RLM over its context file with its question, and
-record the RLM's final answer. Then score.
+For each item in the manifest, run **your system** over its context file with its
+question, and record its final answer. Then score. The eval is method-agnostic:
+"your system" can be a single base-model call, an agent, a retrieval/compaction
+scaffold, or the `/rlm` skill — anything that maps (context_file, question) → answer.
 
-1. **Run the RLM per item** (in this Claude Code session). Use each item's
-   `context_file` and `question` from the manifest (several items share a context file):
+1. **Produce an answer per item.** Use each item's `context_file` and `question`
+   from the manifest (several items share a context file). For example, with the
+   RLM skill in this repo:
 
    ```
    /rlm context=.claude/skills/rlm/eval/data/contexts/trec_coarse_cw8.txt query=<the item's question>
    ```
 
-   Collect each run's final answer into a predictions file, one JSON object per line:
+   …or feed the same context file + question to any other method. Collect each
+   run's final answer into a predictions file, one JSON object per line:
 
    ```json
-   {"id": <id>, "output": "<the RLM's final answer text>"}
+   {"id": <id>, "output": "<your system's final answer text>"}
    ```
 
    (`output` can be the full final answer; the scorer extracts the answer after the last
    `:` exactly as the official OOLONG harness does, so answers phrased like
    `Label: entity` or `Answer: 37` score correctly.)
+
+   To **record token/cost usage**, add any of these optional fields to a line and the
+   scorer will aggregate and report them (see *Recording token/cost usage* below):
+
+   ```json
+   {"id": <id>, "output": "...", "total_tokens": 12345, "total_cost_usd": 0.01}
+   ```
 
 2. **Score:**
 
@@ -130,6 +143,47 @@ python .claude/skills/rlm/eval/score.py --self-test
 
 Feeds the gold answers back through the parser+scorer; should report mean score ≈ 1.00.
 If it doesn't, the manifest and scorer are out of sync.
+
+## Recording token/cost usage
+
+The scorer reports how many tokens (and, optionally, how much money) a run consumed,
+as long as your predictions carry that information. Usage fields are **optional** and
+method-agnostic — add whatever your system reports to each prediction line. The scorer
+reads them in this priority order and sums across items:
+
+- `total_tokens` (or `tokens`) — a single integer; or
+- a nested `usage` object containing `total_tokens`; or
+- component fields `input_tokens` / `output_tokens` / `cache_creation_input_tokens` /
+  `cache_read_input_tokens` (at top level or inside `usage`), which are summed. This
+  matches the `usage` object returned by `claude -p --output-format json`.
+
+Cost is read from `total_cost_usd` / `cost_usd` / `cost`.
+
+Usage is then reported per item (a `tokens` column) and in aggregate, e.g.:
+
+```
+Scored 10 items | mean score = 0.5237 (52.4%)
+Tokens | total = 1,240,118 | mean/item = 124,012 (reported for 10/10 items)
+Cost   | total = $0.2153 | mean/item = $0.0215 (reported for 10/10 items)
+```
+
+Predictions without usage fields still score fine; the `tokens` column just shows `-`.
+
+**Capturing usage from a `claude -p` run.** Run the method with JSON output and copy the
+usage straight into the prediction line:
+
+```bash
+claude -p --output-format json --model haiku --allowedTools "" < prompt.txt > out.json
+python - <<'PY'
+import json
+d = json.load(open("out.json"))
+print(json.dumps({"id": 17000208, "output": d["result"], "usage": d["usage"],
+                  "total_cost_usd": d.get("total_cost_usd")}))
+PY
+```
+
+For a multi-call method (e.g. the RLM, which fans out many sub-calls), sum the usage
+across all calls and record the total as `total_tokens` / `total_cost_usd` for the item.
 
 ## Scoring details
 
@@ -155,7 +209,7 @@ If it doesn't, the manifest and scorer are out of sync.
   downloaded via the HF datasets-server `/filter` API (full, untruncated rows).
 - **Code (scorer / task constructors):** [`abertsch72/oolong`](https://github.com/abertsch72/oolong), MIT License.
 - **License note:** the upstream dataset repo does not publish an explicit data license;
-  this subset is included here solely for local evaluation of the RLM implementation.
+  this subset is included here solely for local evaluation.
   Cite the OOLONG paper if you use it.
 
 ```bibtex

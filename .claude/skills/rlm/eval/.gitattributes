@@ -1,3 +1,3 @@
 # Eval fixtures are data: keep them byte-verbatim (LF) on every platform so the
-# long contexts fed to /rlm are exactly as downloaded (no CRLF rewriting on Windows).
+# long contexts fed to the model are exactly as downloaded (no CRLF rewriting on Windows).
 * text=auto eol=lf

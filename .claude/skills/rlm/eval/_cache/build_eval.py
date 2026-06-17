@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the RLM eval subset from the cached trec_coarse @131072 rows.
+"""Build the OOLONG (trec_coarse) eval subset from the cached @131072 rows.
 
 Reads _cache/raw_131072.jsonl and selects a balanced subset of N=10 'counting'-group
 tasks. The 'counting' group holds the canonical OOLONG aggregations whose answer is a
