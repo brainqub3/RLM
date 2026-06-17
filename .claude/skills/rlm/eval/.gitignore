@@ -1,0 +1,14 @@
+# Bulky intermediate download cache (regenerate with _cache/pyarrow_fetch.py)
+_cache/*.jsonl
+_cache/*.parquet
+
+# Keep the build/fetch scripts under _cache (they document how data was sourced)
+!_cache/*.py
+
+# Local prediction/scoring scratch
+preds*.jsonl
+*.preds.jsonl
+
+# Python bytecode
+__pycache__/
+*.pyc
