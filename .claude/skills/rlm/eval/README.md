@@ -6,6 +6,13 @@ etc. — on a genuinely **long-context**, information-dense reasoning task. You
 produce a predictions file with whatever system you like and score it; the eval
 has no dependency on any particular method.
 
+> **The `/rlm` skill is _not_ required to run or score this eval.** It is only one
+> example method. If the RLM skill is unavailable — or you simply want to benchmark a
+> different system (a plain base-model call, an agent, a retrieval/compaction scaffold,
+> etc.) — **do not invoke RLM**: run your own harness that maps
+> `(context_file, question) → answer`, write the predictions file (below), and score it
+> the same way. The `/rlm` invocation shown later is illustrative, not a prerequisite.
+
 ## Why this benchmark
 
 The reference paper (`paper/2512.24601v3.pdf`, *Recursive Language Models*, arXiv:2512.24601)
