@@ -1,83 +1,222 @@
 ---
 name: rlm
-description: Run a Recursive Language Model-style loop for long-context tasks. Uses a persistent local Python REPL and an rlm-subcall subagent as the sub-LLM (llm_query).
+description: >-
+  Recursive Language Model (RLM) loop for processing a context that is too large
+  to read into the conversation directly. Loads the context as a variable in a
+  persistent Python REPL and answers the query by writing code that probes,
+  chunks, and programmatically sub-queries a cheap LLM (`llm_query`) over slices
+  of it, then aggregates. Use this WHENEVER the user points you at a big context
+  file/log/transcript/codebase/scraped corpus (anything from ~50K chars up to
+  millions) and asks a question that needs most of the content -- counting,
+  aggregating, classifying every item, multi-hop lookup, or summarising the whole
+  thing -- ESPECIALLY when the answer "depends on almost every line" and a single
+  retrieval/grep won't do. Trigger it even if the user doesn't say "RLM": phrases
+  like "this file is huge", "go through the whole log", "how many X across all of
+  these", "label every row", or "it won't fit in context" are all signals to use
+  this skill. Prefer it over dumping the file into chat.
 allowed-tools:
+  - Bash
   - Read
   - Write
   - Edit
   - Grep
   - Glob
-  - Bash
 ---
 
-# rlm (Recursive Language Model workflow)
+# rlm — Recursive Language Model loop
 
-Use this Skill when:
-- The user provides (or references) a very large context file (docs, logs, transcripts, scraped webpages) that won't fit comfortably in chat context.
-- You need to iteratively inspect, search, chunk, and extract information from that context.
-- You can delegate chunk-level analysis to a subagent.
+A faithful instantiation of *Recursive Language Models* (Zhang, Kraska, Khattab;
+arXiv:2512.24601), Algorithm 1, on Claude Code's primitives. The paper's insight:
+**an arbitrarily long prompt should not be fed into a model's context window at
+all. It should live in an environment the model interacts with *programmatically*,
+recursively calling a model over slices of it.** That's what this skill does.
 
 ## Mental model
 
-- Main Claude Code conversation = the root LM.
-- Persistent Python REPL (`rlm_repl.py`) = the external environment.
-- Subagent `rlm-subcall` = the sub-LM used like `llm_query`.
+You (the main Claude Code conversation) are the **root model**. You do **not** read
+the big context into this conversation. Instead:
 
-## How to run
+- The context lives as a `context` variable inside a **persistent Python REPL**
+  (`scripts/rlm_repl.py`). You only ever see *metadata* about it (length, a short
+  prefix) and the *truncated stdout* of code you run — never the whole thing. This
+  is the one rule that lets the context be far larger than any window.
+- You answer by **writing REPL code** that probes the context, decomposes it, and
+  calls a cheap **sub-LM** over the pieces:
+  - `llm_query(prompt)` / `llm_query_map(prompts)` — a single / a parallel batch of
+    plain sub-LM calls (a nested headless `claude -p`, tools off). This is the
+    **leaf**: it reads a *bounded chunk* in its own window and returns text.
+  - `rlm_query(context, query)` — a full **recursive** RLM over a sub-context, for
+    sub-tasks that are themselves too big for one leaf call (depth > 1). Falls back
+    to `llm_query` at the depth limit.
+- You build intermediate results into REPL variables/buffers, then return the
+  answer by setting it in the REPL: `FINAL(answer)` or `FINAL_VAR(varname)`.
 
-### Inputs
+**The division of labour that makes this work:** the **LLM does the semantics**
+(classify this question, extract this fact, summarise this section); your **Python
+does the bookkeeping** (loop over every chunk, count, aggregate, format). Do not
+ask the LLM to count or do arithmetic over the whole corpus, and do not try to do
+the semantics yourself in Python with keyword heuristics — that is exactly the
+failure mode the paper's ablations show. Split the work along that seam.
 
-This Skill reads `$ARGUMENTS`. Accept these patterns:
-- `context=<path>` (required): path to the file containing the large context.
-- `query=<question>` (required): what the user wants.
-- Optional: `chunk_chars=<int>` (default ~200000) and `overlap_chars=<int>` (default 0).
+## When to use this
 
-If the user didn't supply arguments, ask for:
-1) the context file path, and
-2) the query.
+Use it when the context won't fit comfortably in the conversation **and** the task
+needs broad access to it: aggregation/counting over every item, labelling every
+row, multi-hop questions across a corpus, whole-document summarisation, or
+"the answer depends on almost every line". For a one-off needle lookup in a file
+you can just `grep`, you don't need this.
 
-### Step-by-step procedure
+## Inputs (`$ARGUMENTS`)
 
-1. Initialise the REPL state
-   ```bash
-   python3 .claude/skills/rlm/scripts/rlm_repl.py init <context_path>
-   python3 .claude/skills/rlm/scripts/rlm_repl.py status
-   ```
+- `context=<path>` (required): path to the large context file.
+- `query=<question>` (required): what to answer about it.
+- Optional: `sub_model=<alias>` (default `haiku`), `max_workers=<int>` (default 8),
+  `max_depth=<int>` (default 1; >1 enables recursive `rlm_query`).
 
-2. Scout the context quickly
-   ```bash
-   python3 .claude/skills/rlm/scripts/rlm_repl.py exec -c "print(peek(0, 3000))"
-   python3 .claude/skills/rlm/scripts/rlm_repl.py exec -c "print(peek(len(content)-3000, len(content)))"
-   ```
+If the user didn't supply them, ask for the context file path and the query.
 
-3. Choose a chunking strategy
-   - Prefer semantic chunking if the format is clear (markdown headings, JSON objects, log timestamps).
-   - Otherwise, chunk by characters (size around chunk_chars, optional overlap).
+Set optional knobs via environment before running, e.g.:
+`export RLM_SUB_MODEL=haiku RLM_MAX_WORKERS=8 RLM_MAX_DEPTH=1`.
 
-4. Materialise chunks as files (so subagents can read them)
-   ```bash
-   python3 .claude/skills/rlm/scripts/rlm_repl.py exec <<'PY'
-   paths = write_chunks('.claude/rlm_state/chunks', size=200000, overlap=0)
-   print(len(paths))
-   print(paths[:5])
-   PY
-   ```
+## The loop (Algorithm 1)
 
-5. Subcall loop (delegate to rlm-subcall)
-   - For each chunk file, invoke the rlm-subcall subagent with:
-     - the user query,
-     - the chunk file path,
-     - and any specific extraction instructions.
-   - Keep subagent outputs compact and structured (JSON preferred).
-   - Append each subagent result to buffers (either manually in chat, or by pasting into a REPL add_buffer(...) call).
+Run these via the **Bash** tool. State persists between calls in
+`.claude/rlm_state/state.pkl`.
 
-6. Synthesis
-   - Once enough evidence is collected, synthesise the final answer in the main conversation.
-   - Optionally ask rlm-subcall once more to merge the collected buffers into a coherent draft.
+### 1. Initialise — load the context, read only its metadata
 
-## Guardrails
+```bash
+python .claude/skills/rlm/scripts/rlm_repl.py init <context_path>
+```
 
-- Do not paste large raw chunks into the main chat context.
-- Use the REPL to locate exact excerpts; quote only what you need.
-- Subagents cannot spawn other subagents. Any orchestration stays in the main conversation.
-- Keep scratch/state files under .claude/rlm_state/.
+This prints the context's type, char/line/token estimate, and a short prefix.
+**Do not** read the context file with the Read tool — that defeats the purpose.
+
+### 2. Probe — understand the format with small, cheap code
+
+Look at the shape of the data before deciding a strategy. Print *small* slices and
+structure, not the bulk:
+
+```bash
+python .claude/skills/rlm/scripts/rlm_repl.py exec <<'PY'
+print(peek(0, 1500))                 # head
+lines = [l for l in content.splitlines() if l.strip()]
+print("lines:", len(lines))
+print("sample:", lines[1] if len(lines) > 1 else "")
+PY
+```
+
+Ask: Is it line-oriented? JSON objects? Markdown sections? Logs with timestamps?
+The format dictates the chunking.
+
+### 3. Decompose + sub-query — write code that calls the LLM over chunks
+
+This is the core. Chunk the context, build one prompt per chunk, and fan the
+**semantic** work out to the sub-LM with `llm_query_map` (parallel). Keep the
+chunks fat (a leaf can hold a large slice — batch to minimise call count) but small
+enough that the sub-LM stays accurate. Accumulate results in a variable; let Python
+do the aggregation.
+
+```bash
+python .claude/skills/rlm/scripts/rlm_repl.py exec <<'PY'
+# Example shape for an aggregation task: classify every item, then count.
+items = [l.split("Instance:",1)[1].strip() for l in content.splitlines() if "Instance:" in l]
+
+CATS = "numeric value, entity, location, human being, abbreviation, description and abstract concept"
+def build(batch, start):
+    body = "\n".join(f"{start+i}: {q}" for i, q in enumerate(batch))
+    return ("Classify each item into exactly one of these categories: " + CATS + ".\n"
+            "Output one line 'N: <category>' per item, nothing else.\n\n" + body)
+
+BATCH = 50
+prompts, idx = [], []
+for s in range(0, len(items), BATCH):
+    prompts.append(build(items[s:s+BATCH], s)); idx.append(s)
+outs = llm_query_map(prompts)          # parallel sub-LM calls; order preserved
+
+import re
+from collections import Counter
+labels = {}
+for out in outs:
+    for ln in out.splitlines():
+        m = re.match(r"\s*(\d+)\s*[:.\)]\s*(.+)", ln)
+        if m:
+            labels[int(m.group(1))] = m.group(2).strip().strip("*[]").lower()
+counts = Counter(labels.values())
+print("classified:", len(labels), "/", len(items))
+print("counts:", dict(counts))
+PY
+```
+
+Because the REPL is persistent, `items`, `labels`, and `counts` survive into your
+next `exec`. Inspect, sanity-check, and re-run pieces as needed. Save durable
+intermediate text with `add_buffer(...)` (it lives in the `buffers` list).
+
+### 4. Aggregate + answer — compute the final answer, set it in the REPL
+
+Do the final arithmetic/formatting in Python, then set the answer. **The answer
+must be a REPL variable or literal — not just something you say in chat** (so it
+can be arbitrarily long and is captured verbatim):
+
+```bash
+python .claude/skills/rlm/scripts/rlm_repl.py exec <<'PY'
+top = counts.most_common(1)[0][0]
+answer = f"Label: {top}"
+FINAL_VAR("answer")          # or: FINAL(f"Label: {top}")
+PY
+python .claude/skills/rlm/scripts/rlm_repl.py final   # prints the stored answer
+```
+
+Then report that final answer to the user, in the exact output format the query
+asked for.
+
+## REPL interface (what's available inside `exec`)
+
+Injected automatically every `exec` (you never import or define these):
+
+| name | what it does |
+|---|---|
+| `context` / `content` | the full context, as a `str` (two names for the same value) |
+| `llm_query(prompt, model=None, timeout=300, system=...)` | one sub-LM leaf call → text |
+| `llm_query_map(prompts, max_workers=8, ...)` | many leaf calls in parallel → list of texts, in order |
+| `rlm_query(context_text, query, ...)` | recursive RLM over a sub-context (depth>1); falls back to `llm_query` at max depth |
+| `FINAL(answer)` / `FINAL_VAR(name)` | set the final answer (literal / by variable name) |
+| `peek(start, end)` | a slice of the raw context |
+| `grep(pattern, max_matches, window)` | regex search → matches with surrounding snippets |
+| `chunked(seq, size)` | yield size-length slices of a list (lines, etc.) |
+| `chunk_indices(size, overlap)` / `write_chunks(dir, ...)` | character chunk spans / write chunks to files |
+| `add_buffer(text)` / `buffers` | append to / read the persistent list of intermediate results |
+
+Your own variables persist between `exec` calls (anything pickleable). `stdout` is
+truncated (~8000 chars) before you see it — `print` summaries and samples, not bulk.
+
+## Guardrails — these are where RLMs win or lose
+
+- **Never read the whole context into the conversation.** No Read tool on the
+  context file, no `print(content)`. Work through the REPL and sub-LM calls. If you
+  catch yourself wanting the full text in chat, chunk it and `llm_query` it instead.
+- **Split semantics from arithmetic.** LLM = meaning (classify/extract/summarise);
+  Python = counting/aggregation/formatting. Counting with the LLM, or classifying
+  with `if "keyword" in line`, both score badly.
+- **Batch sub-calls; don't make one call per line.** Put many items in each
+  `llm_query` (e.g. 50–100 short lines per call) and parallelise with
+  `llm_query_map`. Thousands of one-item calls are slow and costly for no accuracy
+  gain. But keep batches small enough that the sub-LM doesn't drop or miscount items
+  — verify `classified == total` and re-run any short/garbled batch.
+- **Process the *entire* context before answering** for aggregation tasks — the
+  point is that you can't shortcut it. Check your coverage counts.
+- **Return the answer from the REPL** via `FINAL`/`FINAL_VAR`, then echo it to the
+  user in the requested format. Don't stop at intermediate buffers.
+- **Recursion (`rlm_query`) is for sub-tasks too big for one leaf**, e.g. "analyse
+  these 500 documents that each need their own chunking". It is slower and costlier;
+  most tasks (including pure aggregation) only need `llm_query`. Default `max_depth`
+  is 1.
+
+## Notes
+
+- The sub-LM is a nested headless Claude Code (`claude -p`) and reuses your existing
+  login — no API key or SDK. `llm_query` runs it with tools **off** (a plain LLM);
+  `rlm_query` runs it with bash + this skill **on** (its own REPL).
+- Keep all scratch/state under `.claude/rlm_state/`.
+- An OOLONG long-context eval lives in `eval/` — see `eval/README.md` to score this
+  skill against the paper's reported numbers.

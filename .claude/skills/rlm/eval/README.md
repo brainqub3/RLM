@@ -1,8 +1,8 @@
 # RLM eval — OOLONG (`trec_coarse`) long-context subset
 
 A small, self-contained evaluation set for scoring this repo's RLM implementation
-(the `/rlm` skill + `rlm-subcall` subagent) on a genuinely **long-context**,
-information-dense reasoning task.
+(the `/rlm` skill + its programmatic `llm_query` sub-LM) on a genuinely
+**long-context**, information-dense reasoning task.
 
 ## Why this benchmark
 

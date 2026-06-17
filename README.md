@@ -17,15 +17,24 @@ This repository provides a basic RLM setup that enables Claude to process docume
 
 ## Architecture
 
-This implementation maps to the RLM paper architecture as follows:
+This implementation follows the paper's Algorithm 1 and maps it onto Claude Code's
+primitives as follows:
 
 | RLM Concept | Implementation | Model |
 |-------------|----------------|-------|
-| Root LLM | Main Claude Code conversation | **Claude Opus 4.5** |
-| Sub-LLM (`llm_query`) | `rlm-subcall` subagent | **Claude Haiku** |
-| External Environment | Persistent Python REPL (`rlm_repl.py`) | Python 3 |
+| Root LLM | Main Claude Code conversation (never reads the full context) | your session model (e.g. **Opus**) |
+| External environment | Persistent Python REPL (`rlm_repl.py`) holding the context as a variable | Python |
+| Sub-LM `llm_query` (leaf) | Nested headless Claude Code (`claude -p`, **tools off**), called programmatically from REPL code | **Haiku** (default) |
+| Recursive `rlm_query` (depth>1) | Nested headless Claude Code with **bash + this skill on** (its own REPL) | configurable |
 
-The root LLM (Opus 4.5) orchestrates the overall task, while delegating chunk-level analysis to the faster, lighter sub-LLM (Haiku). The Python REPL maintains state across invocations and provides utilities for chunking, searching, and managing the large context.
+The key fidelity point from the paper: the root model **does not read the context
+into its window**. It only sees metadata and truncated `stdout`, and answers by
+writing REPL code that **programmatically** sub-queries the context in chunks
+(`llm_query` / `llm_query_map`), aggregates with plain Python, and returns the
+answer via `FINAL(...)` / `FINAL_VAR(...)`. The sub-LM is a nested `claude -p`
+process that reuses your existing login — no Anthropic API key or SDK. The split
+that makes it work: the **LLM does the semantics** (classify/extract/summarise) and
+**Python does the arithmetic** (count/aggregate/format).
 
 ## Prerequisites
 
@@ -55,10 +64,10 @@ The root LLM (Opus 4.5) orchestrates the overall task, while delegating chunk-le
    - Your query/question about the content
 
 The RLM workflow will then:
-- Initialize the REPL with your context
-- Chunk the document appropriately
-- Delegate chunk analysis to the sub-LLM
-- Synthesize results in the main conversation
+- Initialize the REPL with your context (loaded as a variable, not into chat)
+- Probe the format and choose a chunking strategy
+- Write REPL code that programmatically sub-queries the context in chunks via `llm_query`
+- Aggregate with plain Python and return the answer via `FINAL` / `FINAL_VAR`
 
 ## Working with Long Files
 
@@ -97,16 +106,19 @@ cd claude_code_RLM
 .
 ├── CLAUDE.md                          # Project instructions for Claude Code
 ├── .claude/
-│   ├── agents/
-│   │   └── rlm-subcall.md            # Sub-LLM agent definition (Haiku)
 │   └── skills/
 │       └── rlm/
-│           ├── SKILL.md              # RLM skill definition
-│           └── scripts/
-│               └── rlm_repl.py       # Persistent Python REPL
+│           ├── SKILL.md              # RLM skill definition (the root's procedure)
+│           ├── scripts/
+│           │   └── rlm_repl.py       # Persistent Python REPL + llm_query/rlm_query
+│           └── eval/                 # OOLONG long-context eval (score vs. the paper)
 ├── context/                           # Recommended location for large context files
 └── README.md
 ```
+
+> Note: earlier versions used a `.claude/agents/rlm-subcall.md` Task subagent as the
+> sub-LM. The faithful implementation calls the sub-LM *programmatically from REPL
+> code* (`claude -p`), so that subagent is no longer used.
 
 ## License
 
