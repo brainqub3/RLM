@@ -4,7 +4,8 @@
       "Read(./rlm_vs_agent_experiment/_archive/**)",
       "Read(./.claude/skills/rlm/eval/data/contexts_with_labels/**)",
       "Read(./.claude/skills/rlm/eval/data/oolong_trec_coarse.jsonl)",
-      "Read(./.claude/skills/rlm/eval/_cache/**)"
+      "Read(./.claude/skills/rlm/eval/_cache/**)",
+      "Read(./rlm_vs_agent_experiment/_sealed/**)"
     ]
   },
   "hooks": {
@@ -16,6 +17,26 @@
             "type": "command",
             "shell": "bash",
             "command": "grep -qE '_archive/|contexts_with_labels/|_cache/|verify_eval.py|oolong_trec_coarse.jsonl' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: off-limits OOLONG answer key/strategy for the cold RLM eval (issue #6) - a path under _archive/, contexts_with_labels/, the manifest (oolong_trec_coarse.jsonl), or the verifier/_cache. Patterns are path-anchored, so plain text mentions are fine; score out-of-band via score.py using the default manifest path.\"}}' || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "grep -qE '_sealed/' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: sealed prior-arm eval results (cross-arm leak guard, issue #6). A finished arm is moved under rlm_vs_agent_experiment/_sealed/ -- its diagnostics.json holds the gold answer and the arm answers -- so a LATER arm claude -p session cannot read it. The driver/seal_run.py move things in/out by name (path not on the command line), so this does not block them; results are unsealed back into runs/<ts>/ after all arms finish, then scored with score.py.\"}}' || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "[ -n \"$RLM_CONTROL_SESSION\" ] && grep -qE 'rlm_repl|llm_query|rlm_query' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: a RLM-OFF control arm may not use the /rlm scaffold (rlm_repl.py / llm_query / rlm_query). Issue #6: the only difference between control and treatment is whether the /rlm skill is on. The control may use normal tools and write its own scripts, but NOT the provided RLM scaffold. Only control sessions set RLM_CONTROL_SESSION; the RLM arm and ordinary sessions are unaffected.\"}}' || true"
           }
         ]
       }

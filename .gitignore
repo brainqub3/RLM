@@ -8,3 +8,5 @@ __pycache__/
 # OOLONG eval run artifacts (timestamped; local scratch).
 # The committed deliverable is rlm_vs_agent_experiment/REPORT.md.
 rlm_vs_agent_experiment/runs/
+# Sealed prior-arm results (cross-arm leak guard; transient -- unsealed back into runs/).
+rlm_vs_agent_experiment/_sealed/

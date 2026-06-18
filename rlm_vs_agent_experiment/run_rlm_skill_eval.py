@@ -173,6 +173,7 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
     err = ""
     tool_uses: Dict[str, int] = {}
     read_context_directly = False
+    used_rlm_scaffold = False
     saw_result = False
     for line in text.splitlines():
         line = line.strip()
@@ -196,6 +197,12 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
                         blob = json.dumps(inp)
                         if ctx_abs and (ctx_abs in blob or Path(ctx_abs).name in blob):
                             read_context_directly = True
+                    # detect a control hand-driving the /rlm scaffold via Bash
+                    if name == "Bash":
+                        cmdtxt = json.dumps(block.get("input") or {})
+                        if ("rlm_repl" in cmdtxt or "llm_query" in cmdtxt
+                                or "rlm_query" in cmdtxt):
+                            used_rlm_scaffold = True
         elif t == "result":
             saw_result = True
             result_text = (d.get("result") or "").strip()
@@ -210,7 +217,7 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
         "result": result_text, "root_tokens": root_tokens, "root_cost": root_cost,
         "num_turns": num_turns, "is_error": is_error, "err": err,
         "tool_uses": tool_uses, "read_context_directly": read_context_directly,
-        "saw_result": saw_result,
+        "used_rlm_scaffold": used_rlm_scaffold, "saw_result": saw_result,
     }
 
 
@@ -275,6 +282,7 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
     env["BASH_DEFAULT_TIMEOUT_MS"] = "1200000"   # 20 min
     env["BASH_MAX_TIMEOUT_MS"] = "1200000"
     if mode == "rlm":
+        env.pop("RLM_CONTROL_SESSION", None)    # RLM arm keeps full scaffold access
         env["RLM_SUB_MODEL"] = "haiku"          # leaf is always haiku (issue #6)
         env["RLM_MAX_WORKERS"] = env.get("RLM_MAX_WORKERS", "8")
         env["RLM_MAX_DEPTH"] = "1"
@@ -282,16 +290,25 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
         prompt = ROOT_PROMPT_TEMPLATE.format(
             ctx=str(ctx_abs), repl=str(REPL), question=item["question"])
         allowed_tools = "Bash Read Write Edit Grep Glob Skill"
+        disallowed = list(DISALLOWED_TOOLS)
     else:  # agent control (RLM off): no Skill tool, no leaf, plain task prompt
         env.pop("RLM_LEAF_USAGE_LOG", None)
+        # Enforce "RLM off" for the control (issue #6: the only difference is the
+        # skill). Under bypassPermissions, --allowedTools does NOT restrict tools --
+        # it only pre-approves -- so we must (a) put Skill on --disallowedTools and
+        # (b) flag this as a control session so the read-guard (.claude/settings.json)
+        # hard-blocks the /rlm scaffold (rlm_repl.py / llm_query / rlm_query) for it.
+        # The control is still free to use normal tools and its own scripts.
+        env["RLM_CONTROL_SESSION"] = "1"
         prompt = AGENT_PROMPT_TEMPLATE.format(
             ctx=str(ctx_abs), question=item["question"])
         allowed_tools = "Bash Read Write Edit Grep Glob"
+        disallowed = list(DISALLOWED_TOOLS) + ["Skill"]
     cmd = [
         CLAUDE, "-p", "--model", root_model,
         "--permission-mode", "bypassPermissions",
         "--allowedTools", allowed_tools,
-        "--disallowedTools", " ".join(DISALLOWED_TOOLS),
+        "--disallowedTools", " ".join(disallowed),
         "--output-format", "stream-json", "--verbose",
     ]
 
@@ -324,12 +341,19 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
         repl_final = ""
         output = parsed["result"] or "[no answer produced]"
     forbidden_used = sorted(FORBIDDEN_RLM_TOOLS.intersection(parsed["tool_uses"]))
+    # Control contamination: a RLM-OFF arm must not touch the /rlm skill or its
+    # scaffold. Enforced by --disallowedTools (Skill) + the control-scoped read-guard;
+    # detected here too so any leak fails LOUD instead of scoring as a valid control.
+    control_used_rlm = (mode != "rlm" and
+                        ("Skill" in parsed["tool_uses"] or parsed["used_rlm_scaffold"]))
     ok = True
     if timed_out:
         ok = False
     elif parsed["is_error"]:
         ok = False
     elif forbidden_used:
+        ok = False
+    elif control_used_rlm:
         ok = False
     elif mode == "rlm" and not repl_final:
         ok = False
@@ -338,6 +362,8 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
         err = "NO_REPL_FINAL"
     if forbidden_used:
         err = (err + "; " if err else "") + "FORBIDDEN_TOOLS_USED=" + ",".join(forbidden_used)
+    if control_used_rlm:
+        err = (err + "; " if err else "") + "CONTROL_USED_RLM_SCAFFOLD"
 
     total_tokens = parsed["root_tokens"] + leaf["leaf_tokens"]
     total_cost = parsed["root_cost"] + leaf["leaf_cost"]
@@ -356,6 +382,8 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
         "wall_seconds": round(dt, 2), "num_turns": parsed["num_turns"],
         "tool_uses": parsed["tool_uses"],
         "read_context_directly": parsed["read_context_directly"],
+        "used_rlm_scaffold": parsed["used_rlm_scaffold"],
+        "control_used_rlm": control_used_rlm,
     }
 
 
@@ -414,6 +442,8 @@ def main(argv: List[str]) -> int:
               + ("" if r["ok"] else f", ERR={r['err']}") + "]", flush=True)
         if args.mode == "rlm" and r.get("read_context_directly"):
             print("      [WARN: RLM root read the context file directly (skill violation)]", flush=True)
+        if args.mode != "rlm" and r.get("control_used_rlm"):
+            print("      [WARN: CONTROL used the /rlm skill or scaffold -- contaminated, ok=False]", flush=True)
 
         preds_lines.append(json.dumps({
             "id": iid, "output": r["output"],
