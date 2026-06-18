@@ -1,0 +1,30 @@
+PLAIN (non-RLM) OOLONG eval | model=opus modes=['agent'] | 6 items
+================================================================================
+[1/6] id=17000238 TASK_TYPE.NUMERIC_ONE_CLASS cw6 | mode=agent
+      -> 'could shift the count by a few either way, but 401 is my best classification.  Answer: 401'
+      [978.3s, 1,180,702 tok, $7.5292]
+--------------------------------------------------------------------------------
+[2/6] id=17000239 TASK_TYPE.NUMERIC_ONE_CLASS cw6 | mode=agent
+      -> 'ation-based count rather than a label lookup; expect a small margin of error.  Answer: 547'
+      [776.8s, 941,657 tok, $8.3584]
+--------------------------------------------------------------------------------
+[3/6] id=17000207 TASK_TYPE.RELATIVE_FREQ cw6 | mode=agent
+      -> "e' is clearly less common than 'entity'.  Answer: numeric value is less common than entity"
+      [601.1s, 260,545 tok, $8.4036]
+--------------------------------------------------------------------------------
+[4/6] id=17000210 TASK_TYPE.RELATIVE_FREQ cw8 | mode=agent
+      -> 'classification noise.  Answer: description and abstract concept is less common than entity'
+      [525.8s, 668,752 tok, $6.0216]
+--------------------------------------------------------------------------------
+[5/6] id=17000213 TASK_TYPE.RELATIVE_FREQ cw8 | mode=agent
+      -> 'usible classification noise across chunks.  Answer: entity is more common than human being'
+      [345.5s, 286,602 tok, $6.4953]
+--------------------------------------------------------------------------------
+[6/6] id=17000237 TASK_TYPE.RELATIVE_FREQ cw6 | mode=agent
+      -> 'more often than label **abbreviation**.  Answer: location is more common than abbreviation'
+      [514.1s, 828,714 tok, $7.0844]
+--------------------------------------------------------------------------------
+================================================================================
+[agent] 6 items | 4,166,972 tokens | $43.8926 | preds -> preds_agent_opus.jsonl
+TOTAL wall time: 3741.7s (62.4 min)
+diagnostics -> C:\Users\johna\OneDrive\Documents\Evals\eval\_runs\plain_run.json

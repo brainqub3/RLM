@@ -1,0 +1,38 @@
+PLAIN (non-RLM) OOLONG eval | model=haiku modes=['agent'] | 10 items
+================================================================================
+[1/10] id=17000206 TASK_TYPE.LEAST_FREQ cw6 | mode=agent
+      -> 'oncept**: "Why/How?" explanations and definitions  Label: description and abstract concept'
+      [232.3s, 433,372 tok, $0.1741]
+--------------------------------------------------------------------------------
+[2/10] id=17000208 TASK_TYPE.MOST_FREQ cw8 | mode=agent
+      -> '1%) - location: 184 (5.79%) - entity: 152 (4.78%)  Label: description and abstract concept'
+      [224.8s, 642,184 tok, $0.2008]
+--------------------------------------------------------------------------------
+[3/10] id=17000222 TASK_TYPE.NUMERIC_ONE_CLASS cw8 | mode=agent
+      -> '(explanation) - "What does \'intractable plantar keratoma\' mean?" (definition)  Answer: 298'
+      [234.7s, 1,303,736 tok, $0.3789]
+--------------------------------------------------------------------------------
+[4/10] id=17000223 TASK_TYPE.NUMERIC_ONE_CLASS cw8 | mode=agent
+      -> 'and brand names   - Movie, book, and song titles - Character and animal names  Answer: 273'
+      [319.5s, 1,687,684 tok, $0.4382]
+--------------------------------------------------------------------------------
+[5/10] id=17000238 TASK_TYPE.NUMERIC_ONE_CLASS cw6 | mode=agent
+      -> '- Human being: 317 (10.0%) - Location: 309 (9.7%) - Numeric value: 308 (9.7%)  Answer: 308'
+      [478.1s, 1,307,022 tok, $0.3806]
+--------------------------------------------------------------------------------
+[6/10] id=17000239 TASK_TYPE.NUMERIC_ONE_CLASS cw6 | mode=agent
+      -> 'direct in 1975?", and "What product doubles your pleasure, doubles your fun?"  Answer: 109'
+      [468.6s, 1,523,709 tok, $0.4183]
+--------------------------------------------------------------------------------
+[7/10] id=17000207 TASK_TYPE.RELATIVE_FREQ cw6 | mode=agent
+Traceback (most recent call last):
+  File "C:\Users\johna\OneDrive\Documents\Evals\eval\run_plain_eval.py", line 219, in <module>
+    raise SystemExit(main(sys.argv[1:]))
+                     ~~~~^^^^^^^^^^^^^^
+  File "C:\Users\johna\OneDrive\Documents\Evals\eval\run_plain_eval.py", line 183, in main
+    print(f"      -> {last!r}", flush=True)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\johna\AppData\Local\Programs\Python\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 49: character maps to <undefined>

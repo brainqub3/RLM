@@ -1,0 +1,22 @@
+PLAIN (non-RLM) OOLONG eval | model=haiku modes=['agent'] | 4 items
+================================================================================
+[1/4] id=17000207 TASK_TYPE.RELATIVE_FREQ cw6 | mode=agent
+      -> ' less common than entity in the dataset.  Answer: numeric value is less common than entity'
+      [68.9s, 261,751 tok, $0.0838]
+--------------------------------------------------------------------------------
+[2/4] id=17000210 TASK_TYPE.RELATIVE_FREQ cw8 | mode=agent
+      -> ' comparison is clear.  Answer: description and abstract concept is less common than entity'
+      [64.8s, 329,408 tok, $0.0985]
+--------------------------------------------------------------------------------
+[3/4] id=17000213 TASK_TYPE.RELATIVE_FREQ cw8 | mode=agent
+      -> 'ly more common than entity questions (57).  Answer: entity is less common than human being'
+      [726.9s, 657,626 tok, $0.4760]
+--------------------------------------------------------------------------------
+[4/4] id=17000237 TASK_TYPE.RELATIVE_FREQ cw6 | mode=agent
+      -> 'ation is more common than abbreviation.  Answer: location is more common than abbreviation'
+      [28.8s, 131,023 tok, $0.0501]
+--------------------------------------------------------------------------------
+================================================================================
+[agent] 4 items | 1,379,808 tokens | $0.7084 | preds -> preds_agent_haiku.jsonl
+TOTAL wall time: 889.4s (14.8 min)
+diagnostics -> C:\Users\johna\OneDrive\Documents\Evals\eval\_runs\plain_run.json

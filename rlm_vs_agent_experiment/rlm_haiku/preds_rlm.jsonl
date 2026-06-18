@@ -1,0 +1,10 @@
+{"id": 17000206, "output": "Label: numeric value", "total_tokens": 1234062, "total_cost_usd": 1.743983}
+{"id": 17000208, "output": "Label: numeric value", "total_tokens": 1224784, "total_cost_usd": 1.825699}
+{"id": 17000222, "output": "Answer: 399", "total_tokens": 1212471, "total_cost_usd": 1.327148}
+{"id": 17000223, "output": "Answer: 803", "total_tokens": 1205096, "total_cost_usd": 1.229648}
+{"id": 17000238, "output": "Answer: 401", "total_tokens": 1216669, "total_cost_usd": 1.295737}
+{"id": 17000239, "output": "Answer: 661", "total_tokens": 1218922, "total_cost_usd": 1.248393}
+{"id": 17000207, "output": "Answer: numeric value is less common than entity", "total_tokens": 1204749, "total_cost_usd": 1.216951}
+{"id": 17000210, "output": "Answer: description and abstract concept is less common than entity", "total_tokens": 1195159, "total_cost_usd": 1.123584}
+{"id": 17000213, "output": "Answer: entity is more common than human being", "total_tokens": 1201290, "total_cost_usd": 1.114581}
+{"id": 17000237, "output": "Answer: location is less common than abbreviation", "total_tokens": 1228838, "total_cost_usd": 1.2563}

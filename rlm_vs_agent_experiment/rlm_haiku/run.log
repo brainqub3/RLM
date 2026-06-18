@@ -1,0 +1,58 @@
+RLM OOLONG eval | model=haiku batch=100 workers=8 | 10 items
+==============================================================================
+[1/10] id=17000206 TASK_TYPE.LEAST_FREQ cw6 (contexts/trec_coarse_cw6.txt)
+      re-run 1: 6 unlabeled/unmapped item(s)
+      coverage 3182/3182 | calls=33 (failed=0, unmapped=0)
+      dist: numeric value=401, entity=657, human being=491, location=489, abbreviation=537, description and abstract concept=607
+      -> Label: numeric value   [277.2s, 1,234,062 tok, $1.7440]
+------------------------------------------------------------------------------
+[2/10] id=17000208 TASK_TYPE.MOST_FREQ cw8 (contexts/trec_coarse_cw8.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=968, entity=801, human being=410, location=316, abbreviation=296, description and abstract concept=391
+      -> Label: numeric value   [334.5s, 1,224,784 tok, $1.8257]
+------------------------------------------------------------------------------
+[3/10] id=17000222 TASK_TYPE.NUMERIC_ONE_CLASS cw8 (contexts/trec_coarse_cw8.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=966, entity=796, human being=413, location=310, abbreviation=298, description and abstract concept=399
+      -> Answer: 399   [302.0s, 1,212,471 tok, $1.3271]
+------------------------------------------------------------------------------
+[4/10] id=17000223 TASK_TYPE.NUMERIC_ONE_CLASS cw8 (contexts/trec_coarse_cw8.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=968, entity=803, human being=412, location=308, abbreviation=295, description and abstract concept=396
+      -> Answer: 803   [237.0s, 1,205,096 tok, $1.2296]
+------------------------------------------------------------------------------
+[5/10] id=17000238 TASK_TYPE.NUMERIC_ONE_CLASS cw6 (contexts/trec_coarse_cw6.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=401, entity=649, human being=499, location=495, abbreviation=537, description and abstract concept=601
+      -> Answer: 401   [315.8s, 1,216,669 tok, $1.2957]
+------------------------------------------------------------------------------
+[6/10] id=17000239 TASK_TYPE.NUMERIC_ONE_CLASS cw6 (contexts/trec_coarse_cw6.txt)
+      re-run 1: 100 unlabeled/unmapped item(s)
+      coverage 3182/3182 | calls=33 (failed=1, unmapped=0)
+      dist: numeric value=400, entity=661, human being=495, location=500, abbreviation=532, description and abstract concept=594
+      -> Answer: 661   [442.5s, 1,218,922 tok, $1.2484]
+------------------------------------------------------------------------------
+[7/10] id=17000207 TASK_TYPE.RELATIVE_FREQ cw6 (contexts/trec_coarse_cw6.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=401, entity=626, human being=496, location=510, abbreviation=541, description and abstract concept=608
+      -> Answer: numeric value is less common than entity   [246.1s, 1,204,749 tok, $1.2170]
+------------------------------------------------------------------------------
+[8/10] id=17000210 TASK_TYPE.RELATIVE_FREQ cw8 (contexts/trec_coarse_cw8.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=967, entity=788, human being=410, location=312, abbreviation=296, description and abstract concept=409
+      -> Answer: description and abstract concept is less common than entity   [243.8s, 1,195,159 tok, $1.1236]
+------------------------------------------------------------------------------
+[9/10] id=17000213 TASK_TYPE.RELATIVE_FREQ cw8 (contexts/trec_coarse_cw8.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=969, entity=812, human being=408, location=312, abbreviation=300, description and abstract concept=381
+      -> Answer: entity is more common than human being   [265.3s, 1,201,290 tok, $1.1146]
+------------------------------------------------------------------------------
+[10/10] id=17000237 TASK_TYPE.RELATIVE_FREQ cw6 (contexts/trec_coarse_cw6.txt)
+      coverage 3182/3182 | calls=32 (failed=0, unmapped=0)
+      dist: numeric value=400, entity=623, human being=497, location=497, abbreviation=511, description and abstract concept=654
+      -> Answer: location is less common than abbreviation   [291.8s, 1,228,838 tok, $1.2563]
+------------------------------------------------------------------------------
+==============================================================================
+DONE 10 items in 2956.0s (49.3 min) | 322 leaf calls | 12,142,040 tokens | $13.3820
+predictions -> C:\Users\johna\OneDrive\Documents\Brainqub3\RLM\claude_code_RLM\.claude\skills\rlm\eval\preds_rlm.jsonl
+diagnostics -> C:\Users\johna\OneDrive\Documents\Brainqub3\RLM\claude_code_RLM\.claude\skills\rlm\eval\_runs\rlm_run.json
