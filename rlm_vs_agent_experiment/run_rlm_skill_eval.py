@@ -200,7 +200,7 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
     # A python-style read of the context by name: open(...ctx...)/read_text/read_csv, or
     # `...ctx...).read[_text|_csv]`.
     _py_read = re.compile(
-        r"\b(open|read_text|read_bytes|read_csv|loadtxt|read)\s*\([^\n;]{0,200}?" + _ctxre
+        r"\b(open|read_text|read_bytes|read_csv|loadtxt|read)\s*\([^\n;|&]{0,200}?" + _ctxre
         + r"|" + _ctxre + r"[\"'\s)]{0,4}\.\s*read", re.I) if _ctxre else None
     # a child claude invocation (control hand-rolling its own sub-model / leaf)
     _claude_spawn = re.compile(r"(^|[^\w.])claude(\.cmd|\.exe)?\b[^\n|&;]*?(\s-p\b|--print\b|--model\b|\bexec\b)")
