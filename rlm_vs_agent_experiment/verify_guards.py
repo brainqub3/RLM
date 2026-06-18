@@ -127,6 +127,15 @@ def static_checks() -> None:
     _check("control sandbox denies the /rlm scaffold", _hook_denies(sbx_cmds, scaffold, base_env))
     _check("RLM sandbox allows the /rlm scaffold", not _hook_denies(sbx_rlm, scaffold, base_env))
 
+    # fix #3: control sandbox denies reading the repo's /rlm skill doc by absolute path;
+    # RLM sandbox must still allow its own SKILL.md.
+    skilldoc = _sample(command="cat /x/.claude/skills/rlm/SKILL.md")
+    _check("control sandbox denies repo SKILL.md", _hook_denies(sbx_cmds, skilldoc, base_env))
+    _check("RLM sandbox allows its own SKILL.md", not _hook_denies(sbx_rlm, skilldoc, base_env))
+    # fix #6: backslash / JSON-escaped path variants are denied
+    bs = _sample(command="type .claude\\skills\\rlm\\eval\\README.md")
+    _check("repo guard denies backslash eval README path", _hook_denies(repo_cmds, bs, base_env))
+
     # sandbox backstop denies repo-absolute answer-key + experiment tree refs
     _check("sandbox guard denies repo experiment tree",
            _hook_denies(sbx_cmds, _sample(command="ls rlm_vs_agent_experiment/runs/"), base_env))

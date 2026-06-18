@@ -29,22 +29,35 @@ surface before the next live run.
 - **Transcript detection** (`control_used_rlm`, `spawned_submodel_calls`,
   `read_context_directly`) is parsed from the stream — independent of any env var.
 
-## KNOWN RISK — git-bash env propagation (affects ACCOUNTING only, NOT integrity)
+## git-bash env propagation — now MITIGATED (env-free accounting)
 
-On this Windows machine, a freshly-passed env var does **not** reach `bash -c`
-(`python -> git-bash` drops it; `python -> python`/`cmd` keep it). If Claude's Bash
-tool launches git-bash the same way, then env-based **cost accounting** may not reach
-the sub-process:
+On this Windows machine a freshly-passed env var does not reach `bash -c`
+(`python -> git-bash` drops it; `python -> python`/`cmd` keep it). The Codex
+implementation review confirmed this would silently zero env-based cost accounting.
+**Accounting is now env-free:**
 
-- `RLM_LEAF_USAGE_LOG` may not reach `rlm_repl` → RLM **leaf cost could read 0**
-  (the RLM arm still *functions*; only the cost number is affected).
-- The control shim relies on `PATH`/`REAL_CLAUDE`/`RLM_CHILD_USAGE_LOG` reaching
-  git-bash → control child-cost capture may not fire (detection still flags it).
+- **RLM leaf cost**: the copied `rlm_repl` reads its usage-log path from a sandbox file
+  (`scripts/leaf_log_path.txt`) when `RLM_LEAF_USAGE_LOG` is absent (the env var is still
+  set as a fallback).
+- **Control shim**: `REAL_CLAUDE` + the child-usage log path are **baked** into the
+  generated `claude_shim.py` (env is only a fallback).
 
-This is **not** confirmed for the real `claude -> bash` path (prior RLM runs did capture
-leaf usage, suggesting it works there). **Validate in the live smoke** and check
-`leaf_tokens`/`leaf_cost` are non-zero for the RLM arm. If they are 0, switch leaf/child
-accounting from env to a sandbox config file the copied `rlm_repl`/shim reads.
+The one remaining live-only dependency is **PATH resolution** of `claude` → the control
+shim inside git-bash. If that fails, control child cost reads 0 — now **reported as "NOT
+cost-accounted"** rather than silently as accounted. Sub-model-spawn *detection* is
+transcript-based and env-free regardless. Confirm in the live smoke: RLM `leaf_cost > 0`,
+and any control spawn is either accounted or clearly flagged unaccounted.
+
+## Codex implementation-review fixes applied (on top of the above)
+
+1. A crashed control (nonzero exit / no `result` event) now **fails** (`NO_RESULT_EVENT` /
+   `EXIT_<n>`); stderr tail kept in diagnostics.
+2. Direct-context-read detection broadened (grep/wc/findstr/Select-String/`open(`/`.read(`)
+   and the blanket `rlm_repl` exemption removed (compound `... && cat context.txt` is caught).
+3. Control sandboxes now deny the repo `/rlm` skill by absolute path (incl. `SKILL.md`),
+   closing the absolute-path skill-doc leak.
+6. Guard patterns are separator-free / tolerate Windows backslashes (`eval..?readme`, `_cache`).
+7. Control sub-model cost is reported as accounted only when it actually was.
 
 ## Live-validation checklist (run during inspection — these spawn `claude`)
 

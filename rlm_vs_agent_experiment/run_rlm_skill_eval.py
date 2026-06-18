@@ -188,8 +188,9 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
     spawned_submodel_calls = 0
     saw_result = False
     ctxname = Path(ctx_abs).name if ctx_abs else ""
-    # read-like shell ops that would pull the context into the conversation
-    _read_op = re.compile(r"\b(cat|sed|head|tail|less|more|awk|nl|strings|type|Get-Content)\b")
+    # read-like ops that would pull the context into the conversation (shell or python)
+    _read_op = re.compile(r"\b(cat|sed|head|tail|less|more|awk|nl|cut|tac|rev|strings|od|xxd|"
+                          r"wc|grep|egrep|fgrep|findstr|type|Get-Content|Select-String)\b", re.I)
     # a child claude invocation (control hand-rolling its own sub-model / leaf)
     _claude_spawn = re.compile(r"(^|[^\w.])claude(\.cmd|\.exe)?\b[^\n|&;]*?(\s-p\b|--print\b|--model\b|\bexec\b)")
     for line in text.splitlines():
@@ -219,9 +220,11 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
                         # control hand-driving the /rlm scaffold via Bash
                         if "rlm_repl" in cmd or "llm_query" in cmd or "rlm_query" in cmd:
                             used_rlm_scaffold = True
-                        # direct read of the context via the shell (not the REPL init)
-                        if (ctxname and ctxname in cmd and _read_op.search(cmd)
-                                and "rlm_repl" not in cmd):
+                        # direct read of the context into the conversation (shell or python).
+                        # `rlm_repl ... init context.txt` has no read-op verb, so it is not
+                        # flagged; a compound `... && cat context.txt` IS now flagged.
+                        if ctxname and ctxname in cmd and (
+                                _read_op.search(cmd) or "open(" in cmd or ".read(" in cmd):
                             read_context_directly = True
                         # a control spawning its own sub-model (D2: allowed but accounted/flagged)
                         spawned_submodel_calls += len(_claude_spawn.findall(cmd))
@@ -299,7 +302,8 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
     # skill for RLM, + the claude accounting shim for controls); the repo answer key,
     # other arms, and REPORT are not reachable by relative exploration (eval_sandbox.py).
     sb = eval_sandbox.build(SANDBOX_BASE / arm_dir.name / str(iid),
-                            ctx_src, mode, REPO, SKILL_SRC)
+                            ctx_src, mode, REPO, SKILL_SRC,
+                            real_claude=CLAUDE, usage_log=str(leaf_log.resolve()))
     ctx_abs = sb["ctx"]                                   # sandbox-local context path
 
     env = dict(os.environ)
@@ -347,7 +351,9 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
     ]
 
     t0 = time.time()
-    ok, timed_out = True, False
+    timed_out = False
+    returncode: Optional[int] = None
+    stderr_tail = ""
     try:
         res = subprocess.run(
             cmd, input=prompt, capture_output=True, text=True,
@@ -355,11 +361,15 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
             cwd=str(sb["root"]), env=env,
         )
         raw = res.stdout or ""
+        returncode = res.returncode
+        stderr_tail = (res.stderr or "")[-2000:]
     except subprocess.TimeoutExpired as e:
         timed_out = True
-        ok = False
         raw = (e.stdout.decode("utf-8", "replace") if isinstance(e.stdout, bytes)
                else (e.stdout or "")) if e.stdout else ""
+        _se = e.stderr
+        if _se:
+            stderr_tail = (_se.decode("utf-8", "replace") if isinstance(_se, bytes) else _se)[-2000:]
     dt = time.time() - t0
 
     stream_log.write_text(raw, encoding="utf-8")
@@ -383,10 +393,16 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
     # issue #6 orchestration-failure (RLM arm): no FINAL, a forbidden/deferral tool, or
     # a direct context read. The direct read now FAILS the item (was warning-only).
     rlm_direct_read = (mode == "rlm" and parsed["read_context_directly"])
+    no_result = not parsed["saw_result"]            # session crashed before a result event
+    bad_exit = (returncode is not None and returncode != 0)
     ok = True
     if timed_out:
         ok = False
     elif parsed["is_error"]:
+        ok = False
+    elif no_result:
+        ok = False
+    elif bad_exit:
         ok = False
     elif forbidden_used:
         ok = False
@@ -397,6 +413,10 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
     elif rlm_direct_read:
         ok = False
     err = "TIMEOUT" if timed_out else parsed["err"]
+    if no_result and not err:
+        err = "NO_RESULT_EVENT"
+    if bad_exit and not err:
+        err = f"EXIT_{returncode}"
     if mode == "rlm" and not repl_final and not err:
         err = "NO_REPL_FINAL"
     if forbidden_used:
@@ -430,6 +450,8 @@ def run_one(item: Dict[str, Any], root_model: str, arm_dir: Path,
         "control_used_rlm": control_used_rlm,
         "spawned_submodel_calls": parsed["spawned_submodel_calls"],
         "sandbox": str(sb["root"]),
+        "returncode": returncode,
+        "stderr_tail": stderr_tail,
     }
 
 
@@ -491,9 +513,13 @@ def main(argv: List[str]) -> int:
         if args.mode != "rlm" and r.get("control_used_rlm"):
             print("      [WARN: CONTROL used the /rlm skill or scaffold -- contaminated, ok=False]", flush=True)
         if args.mode != "rlm" and r.get("spawned_submodel_calls"):
-            print(f"      [note: CONTROL spawned its own sub-model x{r['spawned_submodel_calls']} "
-                  f"(accounted via shim: {r.get('leaf_calls', 0)} child calls, ${r.get('leaf_cost', 0):.4f})]",
-                  flush=True)
+            _lc = r.get("leaf_calls", 0)
+            if _lc:
+                print(f"      [note: CONTROL spawned sub-model x{r['spawned_submodel_calls']}; "
+                      f"accounted via shim: {_lc} child calls, ${r.get('leaf_cost', 0):.4f}]", flush=True)
+            else:
+                print(f"      [WARN: CONTROL spawned sub-model x{r['spawned_submodel_calls']} but child "
+                      f"cost NOT accounted (shim/PATH miss) -- TOTAL understates cost]", flush=True)
 
         preds_lines.append(json.dumps({
             "id": iid, "output": r["output"],
@@ -531,9 +557,11 @@ def main(argv: List[str]) -> int:
               f"[no FINAL / forbidden tool / direct context read]", flush=True)
     else:
         sp = sum(1 for d in diagnostics if d.get("spawned_submodel_calls"))
+        un = sum(1 for d in diagnostics if d.get("spawned_submodel_calls") and not d.get("leaf_calls"))
         if sp:
-            print(f"  control sub-model spawns: {sp}/{len(diagnostics)} items "
-                  f"(child cost accounted via shim, in TOTAL)", flush=True)
+            tail = (f" -- {un} NOT cost-accounted (shim/PATH miss)" if un
+                    else " (child cost accounted via shim, in TOTAL)")
+            print(f"  control sub-model spawns: {sp}/{len(diagnostics)} items" + tail, flush=True)
     print(f"  wall : {total_dt:.1f}s ({total_dt/60:.1f} min)", flush=True)
     print(f"  preds -> {preds_path}", flush=True)
     print(f"  diag  -> {diag_path}", flush=True)
