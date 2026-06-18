@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Glob|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "grep -q _archive && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: rlm_vs_agent_experiment/_archive is off-limits - the withdrawn-run record kept as provenance for the cold RLM eval (issue #6). Do not read it.\"}}' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
