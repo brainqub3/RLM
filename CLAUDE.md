@@ -44,3 +44,19 @@ provenance, `git add -f` that one run folder.)
 This is a **driver convention only — the `/rlm` skill is unchanged**. The skill's own
 on-disk state is the transient `.claude/rlm_state/` REPL pickle (gitignored, and wiped
 per task by the driver); it never writes into the experiment folder.
+
+## Running the OOLONG RLM-vs-agent experiment
+
+**GitHub issue #6 (pinned) is the source of truth** for this experiment — its design,
+the three arms, the exact commands, and the "done when" criteria. Treat the issue as
+the external instruction surface: fetch it at run time with `gh issue view 6` and
+follow it, rather than relying on memory.
+
+When someone asks to run the experiment:
+1. **First ask whether they want the full run.** The full experiment is all three arms
+   × 10 samples and is costly (~$90 and a few hours, dominated by the Opus agent arm).
+   Offer the cheap alternative — a single-task smoke test (`--ids <one id>` per arm) —
+   and only launch the full run once they confirm.
+2. **Then run it exactly as issue #6 instructs** — all arms into one timestamped
+   `runs/<ts>/` folder (shared `--run-id`), then score with `score.py` and fold the
+   numbers into `REPORT.md`.
