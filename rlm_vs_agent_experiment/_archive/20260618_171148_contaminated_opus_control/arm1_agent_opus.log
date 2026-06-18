@@ -1,0 +1,50 @@
+OOLONG eval | AGENT (RLM off) | model=opus | 10 items
+  artifacts -> C:\Users\johna\OneDrive\Documents\Brainqub3\RLM\claude_code_RLM\rlm_vs_agent_experiment\runs\20260618_171148\agent_opus
+================================================================================
+[1/10] id=17000206 TASK_TYPE.LEAST_FREQ cw6 | root=opus
+      -> 'Label: numeric value'
+      [602.9s, turns=10, root 211,572tok/$0.4778 + leaf 0tok/$0.0000 (0 calls) = $0.4778]
+--------------------------------------------------------------------------------
+[2/10] id=17000208 TASK_TYPE.MOST_FREQ cw8 | root=opus
+      -> 'Label: numeric value'
+      [341.4s, turns=8, root 149,625tok/$0.3597 + leaf 0tok/$0.0000 (0 calls) = $0.3597]
+--------------------------------------------------------------------------------
+[3/10] id=17000222 TASK_TYPE.NUMERIC_ONE_CLASS cw8 | root=opus
+      -> 'Answer: 383'
+      [849.5s, turns=13, root 314,294tok/$0.5729 + leaf 0tok/$0.0000 (0 calls) = $0.5729]
+--------------------------------------------------------------------------------
+[4/10] id=17000223 TASK_TYPE.NUMERIC_ONE_CLASS cw8 | root=opus
+      -> 'Answer: 806'
+      [377.9s, turns=9, root 200,467tok/$0.4437 + leaf 0tok/$0.0000 (0 calls) = $0.4437]
+--------------------------------------------------------------------------------
+[5/10] id=17000238 TASK_TYPE.NUMERIC_ONE_CLASS cw6 | root=opus
+      -> 'Answer: 404'
+      [764.2s, turns=15, root 368,056tok/$0.5959 + leaf 0tok/$0.0000 (0 calls) = $0.5959]
+--------------------------------------------------------------------------------
+[6/10] id=17000239 TASK_TYPE.NUMERIC_ONE_CLASS cw6 | root=opus
+      -> 'Answer: 615'
+      [912.4s, turns=13, root 320,713tok/$0.6181 + leaf 0tok/$0.0000 (0 calls) = $0.6181]
+--------------------------------------------------------------------------------
+[7/10] id=17000207 TASK_TYPE.RELATIVE_FREQ cw6 | root=opus
+      -> 'Answer: numeric value is less common than entity'
+      [320.5s, turns=9, root 184,333tok/$0.3240 + leaf 0tok/$0.0000 (0 calls) = $0.3240]
+--------------------------------------------------------------------------------
+[8/10] id=17000210 TASK_TYPE.RELATIVE_FREQ cw8 | root=opus
+      -> 'Answer: description and abstract concept is less common than entity'
+      [330.9s, turns=8, root 157,655tok/$0.2953 + leaf 0tok/$0.0000 (0 calls) = $0.2953]
+--------------------------------------------------------------------------------
+[9/10] id=17000213 TASK_TYPE.RELATIVE_FREQ cw8 | root=opus
+      -> 'Answer: entity is more common than human being'
+      [408.5s, turns=8, root 170,244tok/$0.3700 + leaf 0tok/$0.0000 (0 calls) = $0.3700]
+--------------------------------------------------------------------------------
+[10/10] id=17000237 TASK_TYPE.RELATIVE_FREQ cw6 | root=opus
+      -> 'Answer: location is less common than abbreviation'
+      [784.7s, turns=13, root 310,038tok/$0.5801 + leaf 0tok/$0.0000 (0 calls) = $0.5801]
+--------------------------------------------------------------------------------
+================================================================================
+[agent_opus] 10 items
+  AGENT: 2,386,997 tok | $4.6376
+  TOTAL: 2,386,997 tok | $4.6376
+  wall : 5693.1s (94.9 min)
+  preds -> C:\Users\johna\OneDrive\Documents\Brainqub3\RLM\claude_code_RLM\rlm_vs_agent_experiment\runs\20260618_171148\agent_opus\preds_agent.jsonl
+  diag  -> C:\Users\johna\OneDrive\Documents\Brainqub3\RLM\claude_code_RLM\rlm_vs_agent_experiment\runs\20260618_171148\agent_opus\diagnostics.json
