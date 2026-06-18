@@ -5,6 +5,7 @@
       "Read(./.claude/skills/rlm/eval/data/contexts_with_labels/**)",
       "Read(./.claude/skills/rlm/eval/data/oolong_trec_coarse.jsonl)",
       "Read(./.claude/skills/rlm/eval/_cache/**)",
+      "Read(./.claude/skills/rlm/eval/README.md)",
       "Read(./rlm_vs_agent_experiment/_sealed/**)"
     ]
   },
@@ -16,7 +17,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "grep -qE '_archive/|contexts_with_labels/|_cache/|verify_eval.py|oolong_trec_coarse.jsonl' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: off-limits OOLONG answer key/strategy for the cold RLM eval (issue #6) - a path under _archive/, contexts_with_labels/, the manifest (oolong_trec_coarse.jsonl), or the verifier/_cache. Patterns are path-anchored, so plain text mentions are fine; score out-of-band via score.py using the default manifest path.\"}}' || true"
+            "command": "grep -qiE '_archive/|contexts_with_labels|_cache/|verify_eval.py|oolong_trec_coarse.jsonl|eval/readme|gold_label_stats' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: off-limits OOLONG answer key/strategy for the cold RLM eval (issue #6) - a path under _archive/, contexts_with_labels/ (incl. GOLD_LABEL_STATS.md), the manifest (oolong_trec_coarse.jsonl), the verifier/_cache, or the eval README. Matching is case-insensitive; plain prose mentions without the path are fine; score out-of-band via score.py using the default manifest path.\"}}' || true"
           }
         ]
       },
