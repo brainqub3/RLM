@@ -366,16 +366,22 @@ def main(argv: List[str]) -> int:
     ap.add_argument("--mode", choices=["rlm", "agent"], default="rlm",
                     help="rlm = root drives the /rlm skill (its leaf is always haiku); "
                          "agent = RLM-off control (standard agent, no Skill tool, no leaf)")
+    ap.add_argument("--run-id", default=None,
+                    help="run folder under runs/ (default: current timestamp). Pass the "
+                         "SAME --run-id to every arm of one experiment so they group into "
+                         "runs/<run-id>/<arm>/.")
     ap.add_argument("--ids", default=None, help="comma-separated subset of item ids")
     ap.add_argument("--timeout", type=int, default=3000, help="per-task root timeout (s)")
     args = ap.parse_args(argv)
 
-    if args.mode == "rlm":
-        arm_dir = HERE / f"rlm_skill_{args.root}"
-        preds_path = arm_dir / "preds_rlm_skill.jsonl"
-    else:
-        arm_dir = HERE / f"agent_{args.root}"
-        preds_path = arm_dir / "preds_agent.jsonl"
+    # All artifacts go under a single timestamped run folder so the experiment tree
+    # stays clean (nothing loose to archive later). One experiment == one --run-id
+    # shared across its arms: runs/<run-id>/<arm>/. `runs/` is gitignored scratch;
+    # the committed deliverable is REPORT.md.
+    run_id = args.run_id or time.strftime("%Y%m%d_%H%M%S")
+    arm_name = f"rlm_skill_{args.root}" if args.mode == "rlm" else f"agent_{args.root}"
+    arm_dir = HERE / "runs" / run_id / arm_name
+    preds_path = arm_dir / ("preds_rlm_skill.jsonl" if args.mode == "rlm" else "preds_agent.jsonl")
     runs_dir = arm_dir / "_runs"
     runs_dir.mkdir(parents=True, exist_ok=True)
     diag_path = arm_dir / "diagnostics.json"
@@ -391,6 +397,7 @@ def main(argv: List[str]) -> int:
     label = (f"RLM | root={args.root} leaf=haiku" if args.mode == "rlm"
              else f"AGENT (RLM off) | model={args.root}")
     print(f"OOLONG eval | {label} | {len(items)} items", flush=True)
+    print(f"  artifacts -> {arm_dir}", flush=True)
     print("=" * 80, flush=True)
 
     for n, item in enumerate(items, 1):

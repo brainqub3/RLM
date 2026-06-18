@@ -4,3 +4,7 @@
 # Python caches
 __pycache__/
 *.pyc
+
+# OOLONG eval run artifacts (timestamped; local scratch).
+# The committed deliverable is rlm_vs_agent_experiment/REPORT.md.
+rlm_vs_agent_experiment/runs/
