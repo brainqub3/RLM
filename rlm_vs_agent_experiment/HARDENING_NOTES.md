@@ -52,8 +52,11 @@ and any control spawn is either accounted or clearly flagged unaccounted.
 
 1. A crashed control (nonzero exit / no `result` event) now **fails** (`NO_RESULT_EVENT` /
    `EXIT_<n>`); stderr tail kept in diagnostics.
-2. Direct-context-read detection broadened (grep/wc/findstr/Select-String/`open(`/`.read(`)
-   and the blanket `rlm_repl` exemption removed (compound `... && cat context.txt` is caught).
+2. Direct-context-read detection now keys on a read-op/read-call that actually TARGETS
+   `context.txt` (adjacency, not mere co-occurrence): catches `cat context.txt`, compound
+   `... && cat context.txt`, and `open()`/`.read_text()`/`read_csv()` — and does NOT
+   false-positive on legit RLM `exec` code that merely mentions `grep`/`wc` on other lines.
+   (Unit-tested in `verify_guards.py`.)
 3. Control sandboxes now deny the repo `/rlm` skill by absolute path (incl. `SKILL.md`),
    closing the absolute-path skill-doc leak.
 6. Guard patterns are separator-free / tolerate Windows backslashes (`eval..?readme`, `_cache`).

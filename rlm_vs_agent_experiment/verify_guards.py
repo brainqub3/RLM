@@ -168,6 +168,30 @@ def live_smoke(item_id: str) -> None:
     print("NOTE: also eyeball the *.stream.jsonl transcripts for any answer-key path access.")
 
 
+def detection_checks() -> None:
+    """Unit-check the driver's direct-context-read detection (no model calls)."""
+    print("DETECTION checks (driver _parse_root_stream, no model calls)")
+    import run_rlm_skill_eval as drv
+    ctx = "/sbx/context.txt"
+
+    def reads(cmd: str) -> bool:
+        line = json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Bash", "input": {"command": cmd}}]}})
+        return bool(drv._parse_root_stream(line, ctx)["read_context_directly"])
+
+    _check("detect: cat context.txt", reads("cat context.txt"))
+    _check("detect: compound '&& cat context.txt'",
+           reads("python rlm_repl.py init /sbx/context.txt && cat context.txt"))
+    _check("detect: python open(...).read()",
+           reads("python -c \"print(open('context.txt').read())\""))
+    _check("detect: Path(...).read_text()",
+           reads("python -c \"from pathlib import Path; print(Path('context.txt').read_text())\""))
+    _check("no false-pos: rlm_repl init only",
+           not reads("python rlm_repl.py init /sbx/context.txt"))
+    _check("no false-pos: REPL exec mentioning grep()/context.txt on other lines",
+           not reads("python rlm_repl.py exec <<'PY'\nm = grep('q'); print(len(content))\n# uses context.txt indirectly\nPY"))
+
+
 def main(argv) -> int:
     if argv and argv[0] == "--live":
         if len(argv) < 2:
@@ -175,6 +199,7 @@ def main(argv) -> int:
         live_smoke(argv[1])
     else:
         static_checks()
+        detection_checks()
     ok = all(_results)
     print("=" * 60)
     print(f"VERIFY: {'ALL PASS' if ok else 'FAILURES PRESENT'} "

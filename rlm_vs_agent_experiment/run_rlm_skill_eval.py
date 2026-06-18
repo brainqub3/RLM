@@ -188,9 +188,20 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
     spawned_submodel_calls = 0
     saw_result = False
     ctxname = Path(ctx_abs).name if ctx_abs else ""
-    # read-like ops that would pull the context into the conversation (shell or python)
-    _read_op = re.compile(r"\b(cat|sed|head|tail|less|more|awk|nl|cut|tac|rev|strings|od|xxd|"
-                          r"wc|grep|egrep|fgrep|findstr|type|Get-Content|Select-String)\b", re.I)
+    _ctxre = re.escape(ctxname) if ctxname else None
+    # A shell read-op whose target IS the context file: read-op and filename in the SAME
+    # simple command (no ; | & or newline between), so REPL code that merely mentions
+    # "grep"/"wc" elsewhere does not false-positive, while `... && cat context.txt` still
+    # matches (the `cat context.txt` clause stands alone).
+    _direct_read = re.compile(
+        r"\b(cat|sed|head|tail|less|more|awk|nl|cut|tac|rev|strings|od|xxd|wc|grep|egrep|"
+        r"fgrep|findstr|type|Get-Content|Select-String)\b[^\n;|&]{0,200}?"
+        + _ctxre, re.I) if _ctxre else None
+    # A python-style read of the context by name: open(...ctx...)/read_text/read_csv, or
+    # `...ctx...).read[_text|_csv]`.
+    _py_read = re.compile(
+        r"\b(open|read_text|read_bytes|read_csv|loadtxt|read)\s*\([^\n;]{0,200}?" + _ctxre
+        + r"|" + _ctxre + r"[\"'\s)]{0,4}\.\s*read", re.I) if _ctxre else None
     # a child claude invocation (control hand-rolling its own sub-model / leaf)
     _claude_spawn = re.compile(r"(^|[^\w.])claude(\.cmd|\.exe)?\b[^\n|&;]*?(\s-p\b|--print\b|--model\b|\bexec\b)")
     for line in text.splitlines():
@@ -220,11 +231,12 @@ def _parse_root_stream(text: str, ctx_abs: str) -> Dict[str, Any]:
                         # control hand-driving the /rlm scaffold via Bash
                         if "rlm_repl" in cmd or "llm_query" in cmd or "rlm_query" in cmd:
                             used_rlm_scaffold = True
-                        # direct read of the context into the conversation (shell or python).
-                        # `rlm_repl ... init context.txt` has no read-op verb, so it is not
-                        # flagged; a compound `... && cat context.txt` IS now flagged.
-                        if ctxname and ctxname in cmd and (
-                                _read_op.search(cmd) or "open(" in cmd or ".read(" in cmd):
+                        # direct read of the context into the conversation (shell or python),
+                        # keyed on a read-op/read-call that actually TARGETS context.txt -- so
+                        # legit `rlm_repl init ... context.txt` (no read verb) and REPL code
+                        # merely mentioning "grep"/"wc" on other lines do not false-positive.
+                        if _ctxre and ((_direct_read and _direct_read.search(cmd))
+                                       or (_py_read and _py_read.search(cmd))):
                             read_context_directly = True
                         # a control spawning its own sub-model (D2: allowed but accounted/flagged)
                         spawned_submodel_calls += len(_claude_spawn.findall(cmd))
