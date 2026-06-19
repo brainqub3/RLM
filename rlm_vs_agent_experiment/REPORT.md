@@ -11,6 +11,22 @@ single-shot headless `claude -p`, cold per-task state, default per-task timeout.
 out-of-band with `score.py` (default manifest). Models: root/agent `claude-opus-4-8`,
 leaf/agent `claude-haiku-4-5`.
 
+## How RLMs work
+
+A **Recursive Language Model** (RLM) treats a long prompt not as something to cram into the
+model's context window, but as an *external environment* the model interacts with
+programmatically. The root LLM is given only metadata about the context (e.g. its length) plus a
+REPL in which the full text sits as a variable; it then writes code to peek into and decompose
+that variable and to **recursively call an LLM over slices of it**, aggregating the results — so
+it never reads the whole input directly. This sidesteps the "context rot" that degrades frontier
+models on long inputs and lets the system handle prompts well beyond any single context window.
+In our setup the root is **Opus 4.8** (orchestration only) and the recursive leaf calls go to a
+cheap **Haiku 4.5** — opus brain, cheap labour.
+
+See *Recursive Language Models*, Zhang, Kraska & Khattab (MIT CSAIL), arXiv:2512.24601 — the
+committed PDF is at [`paper/2512.24601v3.pdf`](../paper/2512.24601v3.pdf); our scaffold follows
+its Algorithm 1.
+
 ---
 
 ## Headline
@@ -21,18 +37,26 @@ leaf/agent `claude-haiku-4-5`.
 | Opus agent | `claude-opus-4-8`, plain agent (RLM off) | 40.0% | $25.43 | 9.34 M | 115.0 min | — |
 | Haiku agent | `claude-haiku-4-5`, plain agent (RLM off) | 40.0% | $1.59 | 6.31 M | 19.9 min | — |
 
-**The result is split, and it does _not_ confirm the headline hypothesis.**
+**The result is split — and which way it points depends on whether you pay per token or per
+subscription.**
 
 - ✅ **Accuracy:** the RLM scaffold won — **55.6% vs 40.0% / 40.0%**, +15.6 points over *both*
-  controls. The Opus root reliably drove the skill: **orchestration-failure rate 0/10** (every
-  task set `FINAL`, none used a forbidden/deferral tool, none read the context directly).
-- ❌ **Cost:** the RLM was the **most expensive** arm — **$47.73**, ~1.9× the Opus agent and
-  ~30× the Haiku agent. The hypothesis was "match Opus accuracy at *much lower* cost." Instead
-  the scaffold *exceeded* Opus accuracy at *higher* cost. The cheap-per-call Haiku leaf was not
-  cheap in aggregate: the root's self-authored strategy issued **~1,303 leaf calls** over
-  **42.4 M tokens** ($42.86).
+  controls, with **0/10 orchestration failures** (every task set `FINAL`, none used a
+  forbidden/deferral tool, none read the context directly).
+- ✅ **Frontier-model usage:** the RLM spent only **2.54 M Opus tokens** on the root vs the Opus
+  agent's **9.34 M** — **~3.7× fewer frontier tokens** — pushing the bulk (42.4 M tokens) onto
+  the cheap, abundant Haiku tier. On subscription plans, where the *top tier is the rationed
+  resource*, this is the number that matters (see below).
+- ✅ **Speed:** the RLM finished the 10 tasks in **88.6 min vs the Opus agent's 115.0 min** —
+  **~23% faster** — despite moving far more total tokens, because the Haiku leaf is fast and the
+  Opus agent burns wall-clock re-reading the 131K context over many turns.
+- ❌ **Raw pay-per-token cost:** the RLM was the **most expensive** arm — **$47.73**, ~1.9× the
+  Opus agent and ~30× Haiku. The cheap-per-call leaf is not cheap in aggregate: the root's
+  self-authored strategy issued **~1,303 leaf calls** over **42.4 M tokens** ($42.86). For
+  pay-per-token API billing this is a real loss and contradicts the original "match Opus accuracy
+  at *lower* cost" hypothesis — but see the subscription view below, where the trade-off inverts.
 
-### The frontier
+### Cost/accuracy frontier (pay-per-token dollars)
 
 The two agents define the cost/accuracy frontier; the RLM sits above and to the right of it:
 
@@ -49,6 +73,50 @@ accuracy
 - **The RLM is the only arm above 40%.** If you need the extra accuracy it is the only option on
   offer — but you pay the most for it. It does not "match Opus accuracy cheaply"; it buys
   +15.6 points at the highest price.
+
+---
+
+## Frontier-model usage — the subscription view
+
+The pay-per-token dollar figure hides a split in *which* resource each arm consumes. On Claude
+subscription plans the binding constraint is not dollars but **usage of the top tier**: Opus (and
+Fable) draw down plan limits fastest and are the first models you get rate-limited on. Counted in
+*frontier* tokens, the RLM is the frugal arm, not the expensive one:
+
+| Arm | Frontier (Opus) tokens | Cheap-tier (Haiku) tokens | Accuracy |
+|---|---:|---:|---:|
+| **RLM** | **2.54 M** (root) | 42.38 M (leaf) | 55.6% |
+| Opus agent | 9.34 M | — | 40.0% |
+| Haiku agent | — | 6.31 M | 40.0% |
+
+The RLM spent **~3.7× fewer Opus tokens than the Opus agent** while scoring 15.6 points higher —
+it reserves Opus for orchestration over metadata and offloads the token-heavy reading/counting to
+the abundant Haiku tier.
+
+**Implication (argued, not billed by this eval — which prices everything in pay-per-token USD):**
+a subscriber who routinely hits the Opus ceiling could get *more* frontier-grade long-context
+answers per billing period by running the RLM than by pointing a plain Opus agent at the raw
+context — same-or-better accuracy for ~3.7× less of the rationed Opus budget per task, paid for in
+cheap, abundant Haiku tokens. In that setting the RLM doesn't merely match the frontier agent's
+accuracy in the scarce resource — it *exceeds* it. This inverts the "most expensive arm" headline:
+expensive in pay-per-token dollars, frugal in the resource a subscription actually rations, and so
+plausibly a net **performance gain** for subscription users who would otherwise be throttled down
+to a weaker model once their Opus allowance runs out.
+
+## Speed — the RLM beat the frontier agent
+
+| Arm | Wall (10 tasks) |
+|---|---:|
+| Haiku agent | 19.9 min |
+| **RLM** | **88.6 min** |
+| Opus agent | 115.0 min |
+
+Despite moving ~5× more total tokens than the Opus agent (44.9 M vs 9.3 M), the RLM finished
+**~23% faster** (88.6 vs 115.0 min). The Haiku leaf is high-throughput and each sub-call is short,
+whereas the plain Opus agent spends long, high-reasoning turns repeatedly re-reading the 131K
+context (up to 33 turns on a single task). So the leaf's token-hunger does **not** translate into a
+wall-clock penalty here — the scaffold is both more accurate *and* faster than the frontier agent
+it is meant to replace.
 
 ---
 
@@ -122,11 +190,22 @@ Where the RLM's +15.6 points come from:
   agent's 20% collapse." On this sample the Haiku agent did **not** collapse — it tied the Opus
   agent at 40.0% for $1.59. So the cheap control was far stronger (and far more cost-efficient)
   than the framing assumed.
-- **The cost story is the real finding.** The scaffold is mechanically sound (0% orchestration
-  failure, root stays cheap) and more accurate, but as self-authored here it is **token-hungry**:
-  ~1,300 leaf calls / 42 M tokens. To deliver on the original promise (frontier accuracy at low
-  cost) the leaf strategy would need to be far more token-frugal — fewer, larger, deduplicated
-  passes rather than hundreds of overlapping chunk reads. That is the obvious next lever.
+- **The cost story has two sides.** The scaffold is mechanically sound (0% orchestration failure,
+  root stays cheap) and more accurate, but as self-authored here it is **token-hungry**: ~1,300
+  leaf calls / 42 M tokens. In *pay-per-token dollars* that makes it the most expensive arm. In
+  *frontier-token* terms (the subscription view above) it is the frugal one. Both are true; which
+  one matters depends on how you are billed. Either way, the obvious next lever is a more
+  token-frugal leaf strategy — fewer, larger, deduplicated passes rather than hundreds of
+  overlapping chunk reads — which would improve the dollar story *and* the frontier story at once.
+- **The subscription advantage is an inference, not a billed result.** This eval prices everything
+  in pay-per-token USD; the "more out of your subscription" argument follows from the measured
+  Opus-vs-Haiku token split, but was not directly measured as subscription throughput or against
+  real plan rate-limits. For pay-per-token API users, the RLM here is simply a cost regression.
+- **Consistent with the paper's cost profile.** *Recursive Language Models* (arXiv:2512.24601)
+  reports RLMs beating Claude Code by ~13% (median) at *comparable* cost, with costs comparable at
+  the median but spiking at the tail (their Fig. 11). Our run reproduces that shape: cheap,
+  comparable median tasks and a heavy tail on the counting questions (one task alone — 277 leaf
+  calls / $8.65 — cost more than the entire Haiku-agent arm).
 - **Counting is the shared weakness.** No arm reliably counts label occurrences across the full
   context (combined 0/12 exact on `NUMERIC`, one near-miss). This is the task family most worth
   targeting next, for both agents and the scaffold.
