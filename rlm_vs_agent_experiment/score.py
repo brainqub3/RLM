@@ -51,7 +51,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_MANIFEST = HERE / "data" / "oolong_trec_coarse.jsonl"
+# The manifest lives at the experiment root (same place the driver reads it from,
+# run_rlm_skill_eval.py: MANIFEST = HERE / "oolong_trec_coarse.jsonl"). Fall back to
+# the legacy data/ subdir layout if a root copy isn't present.
+DEFAULT_MANIFEST = HERE / "oolong_trec_coarse.jsonl"
+if not DEFAULT_MANIFEST.exists():
+    DEFAULT_MANIFEST = HERE / "data" / "oolong_trec_coarse.jsonl"
 
 COMPARISON_PHRASES = ("more common", "less common", "same frequency")
 
